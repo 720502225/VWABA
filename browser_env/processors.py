@@ -809,45 +809,175 @@ class ImageObservationProcessor(ObservationProcessor):
     def get_page_bboxes(self, page: Page) -> list[list[float]]:
         """JavaScript code to return bounding boxes and other metadata from HTML elements."""
         js_script = """
-        (() => {
-            const interactableSelectors = [
-                'a[href]:not(:has(img))', 'a[href] img', 'button', 'input:not([type="hidden"])', 'textarea', 'select',
-                '[tabindex]:not([tabindex="-1"])', '[contenteditable="true"]', '[role="button"]', '[role="link"]',
-                '[role="checkbox"]', '[role="menuitem"]', '[role="tab"]', '[draggable="true"]',
-                '.btn', 'a[href="/notifications"]', 'a[href="/submit"]', '.fa.fa-star.is-rating-item', 'input[type="checkbox"]'
+  (() => {
+            // 1. 定义哪些标签天生是交互式的
+            const nativeInteractableTags = new Set([
+                'A', 'BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'DETAILS', 'SUMMARY', 
+                'LABEL', 'STRONG', 'B', 'I', 'EM'
+            ]);
 
-            ];
+            // 2. 定义哪些 input type 是隐藏的
+            const hiddenInputTypes = new Set(['hidden', 'image']); // image 这里的处理看需求，通常单独处理
 
-            const textSelectors = ['p', 'span', 'div:not(:has(*))', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'article'];
-            const modifiedTextSelectors = textSelectors.map(selector =>
-                `:not(${interactableSelectors.join(', ')}):not(style) > ${selector}`
-            );
+            function isInteractable(element) {
+                const tagName = element.tagName;
+                
+                // 1. 基础过滤：排除不可见元素、BODY、以及被禁用的元素
+                if (element.offsetParent === null && tagName !== 'BODY') return false; 
+                if (element.hasAttribute('disabled')) return false;
 
-            const combinedSelectors = [...interactableSelectors, ...modifiedTextSelectors];
-            const elements = document.querySelectorAll(combinedSelectors.join(', '));
+                // 2. 原生交互标签 (HTML 标准)
+                if (nativeInteractableTags.has(tagName)) {
+                    if (tagName === 'INPUT' && hiddenInputTypes.has(element.type)) return false;
+                    return true;
+                }
 
+                // 3. ARIA 语义 (无障碍标准 - 最通用的识别方式)
+                // 增加了 'checkbox', 'switch', 'combobox', 'option', 'treeitem', 'slider' 等
+                const role = element.getAttribute('role');
+                if (role && [
+                    'button', 'link', 'menuitem', 'tab', 'checkbox', 'switch', 
+                    'radio', 'combobox', 'option', 'treeitem', 'slider', 'gridcell'
+                ].includes(role)) {
+                    return true;
+                }
+
+                // 4. 检查 ContentEditable (输入框)
+                if (element.isContentEditable) return true;
+
+                // 5. 检查 TabIndex (键盘可聚焦 = 99% 可交互)
+                // 排除 tabIndex="-1" (通常用于编程式聚焦，不一定是直接交互点)
+                const tabIndex = element.getAttribute('tabindex');
+                if (tabIndex !== null && tabIndex !== '-1') return true;
+
+                // =================================================================
+                //  这里开始是“通用黑魔法”
+                // =================================================================
+
+                // 6. 框架内部事件监听检测 (针对 React, Vue, Angular)
+                // 这是检测 "div 按钮" 最强通用的方法，不依赖 CSS
+                try {
+                    const keys = Object.keys(element);
+                    // React 16+ / 17+ / 18+
+                    const reactKey = keys.find(key => key.startsWith('__reactProps') || key.startsWith('__reactEventHandlers'));
+                    if (reactKey) {
+                        const props = element[reactKey];
+                        if (props && (props.onClick || props.onMouseDown || props.onPointerDown || props.onTouchStart)) {
+                            return true;
+                        }
+                    }
+                    // Vue 2 / 3
+                    if (element.__vue__ || element._vnode) {
+                        // Vue 的检测稍微复杂一点，但通常 Vue 组件根节点是有意义的
+                        // 这里做一个简单假设：如果它是 Vue 组件根节点，且不是纯展示容器，大概率可交互
+                        // 但为了不误判，结合下面的 CSS 检查更稳
+                    }
+                } catch (e) {
+                    // 忽略跨域等安全报错
+                }
+
+                // 7. 内联事件检测 (针对老旧系统或原生 JS)
+                if (element.onclick || element.onmousedown || element.getAttribute('onclick')) {
+                    return true;
+                }
+
+                // 8. 样式计算 (最耗性能，放在最后)
+                const style = window.getComputedStyle(element);
+
+                // [通用特征] 鼠标变手型
+                // 注意：如果父级是 pointer，子级通常也是 pointer。
+                // 我们可以认为：如果我是一个叶子节点(或包含文本)，且鼠标是手型，那我就是可交互区域的一部分
+                if (style.cursor === 'pointer') {
+                    return true;
+                }
+
+                // [通用特征] 禁止文本选中 (User Select None)
+                // 90% 的自定义按钮（div/span）都会加这个样式，防止点击变蓝
+                if (style.userSelect === 'none' || style.webkitUserSelect === 'none') {
+                    // 排除掉仅仅是图标的情况，或者确实是需要防止复制的文本
+                    // 这里可以作为一个强信号
+                    return true;
+                }
+
+                return false;
+            }
+            
+            // 3. 递归遍历函数 (穿透 Shadow DOM)
+            function collectElements(root, elements = []) {
+                // 使用 TreeWalker 遍历当前 root 下的所有节点
+                const walker = document.createTreeWalker(
+                    root,
+                    NodeFilter.SHOW_ELEMENT,
+                    {
+                        acceptNode: (node) => {
+                            // 稍微过滤一下，避免遍历太多无用节点
+                            if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return NodeFilter.FILTER_REJECT;
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                    }
+                );
+
+                let currentNode = walker.currentNode;
+                while(currentNode) {
+                    // 处理当前节点
+                    if (currentNode !== root) { // 跳过 root 本身
+                        if (isInteractable(currentNode)) {
+                            elements.push(currentNode);
+                        }
+                        
+                        // 【核心】如果有 Shadow Root，递归进入
+                        if (currentNode.shadowRoot) {
+                            collectElements(currentNode.shadowRoot, elements);
+                        }
+                    }
+                    currentNode = walker.nextNode();
+                }
+                return elements;
+            }
+
+            // 执行遍历
+            const allElements = collectElements(document.body);
+
+            // 4. 生成 CSV 数据 (保持原有格式)
             const pixelRatio = window.devicePixelRatio;
             let csvContent = "ID,Element,Top,Right,Bottom,Left,Width,Height,Alt,Class,Id,TextContent,Interactable\\n";
             let counter = 1;
 
-            elements.forEach(element => {
+            allElements.forEach(element => {
                 const rect = element.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) return;
-                let altText = element.getAttribute('alt') || '';
-                altText = altText.replace(/"/g, ''); // Escape double quotes in alt text
-                const classList = element.className || '';
-                const id = element.id || '';
-                let textContent = element.textContent || '';
-                textContent = textContent.replace(/"/g, ''); // Escape double quotes in textContent
+                
+                // 再次过滤：确保宽高有效
+                if (rect.width < 5 || rect.height < 5) return;
 
-                // Determine if the element is interactable
-                const isInteractable = interactableSelectors.some(selector => element.matches(selector));
+                // 获取最准确的文本描述
+                let altText = element.getAttribute('alt') || element.getAttribute('aria-label') || element.getAttribute('title') || '';
+                altText = altText.replace(/"/g, ''); 
+                
+                const classList = element.className && typeof element.className === 'string' ? element.className : '';
+                const id = element.id || '';
+                
+                // 优先取自身文本，如果为空且是 icon 按钮，可能需要取 textContent
+                let textContent = element.textContent || '';
+                // 简单清洗文本
+                textContent = textContent.replace(/\\s+/g, ' ').trim().replace(/"/g, '');
+                
+                // 如果 textContent 太长（比如包含了整个卡片内容），截断它
+                if (textContent.length > 200) textContent = textContent.substring(0, 200);
 
                 const dataString = [
-                    counter, element.tagName, (rect.top + window.scrollY) * pixelRatio,
-                    (rect.right + window.scrollX) * pixelRatio, (rect.bottom + window.scrollY) * pixelRatio,
-                    (rect.left + window.scrollX) * pixelRatio, rect.width * pixelRatio, rect.height * pixelRatio,
-                    altText, classList, id, textContent, isInteractable
+                    counter, 
+                    element.tagName, 
+                    (rect.top + window.scrollY) * pixelRatio,
+                    (rect.right + window.scrollX) * pixelRatio, 
+                    (rect.bottom + window.scrollY) * pixelRatio,
+                    (rect.left + window.scrollX) * pixelRatio, 
+                    rect.width * pixelRatio, 
+                    rect.height * pixelRatio,
+                    altText, 
+                    classList, 
+                    id, 
+                    textContent, 
+                    true // 既然通过了筛选，这里默认为 true
                 ].map(value => `"${value}"`).join(",");
 
                 csvContent += dataString + "\\n";
