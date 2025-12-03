@@ -1,0 +1,89 @@
+{
+  "description": "Modular prompt templates for multi-agent system",
+  "version": "1.0",
+  "last_updated": "2025-01-29",
+  "agents": {
+    "context_agent": {
+      "observation_summarization": {
+        "name": "Observation Summarization",
+        "task": "Generate intelligent summary of web page observations",
+        "template": "Generate a concise but comprehensive summary of these web page observations for context awareness.\n\nPAGE OBSERVATIONS:\n{observations_text}\n\nFocus on:\n1. Key page content and structure\n2. Important elements, forms, or interactive components\n3. Navigation paths or menus\n4. Search functionality or filters\n5. Product/service information if applicable\n6. Any error messages or unusual elements\n\nProvide a 3-4 sentence summary that captures the essential information from these observations that would be most useful for planning next actions in a web automation task:",
+        "variables": ["observations_text"],
+        "temperature": 0.6,
+        "max_tokens": 2048
+      },
+      "summary_generation": {
+        "name": "Context Summary Generation",
+        "task": "Generate concise context summaries for agent coordination",
+        "template": "Generate a concise context summary for a web automation task.\n\nTASK INFORMATION:\nUser Goal: {user_goal}\nTotal Steps Taken: {total_steps}\n\nRECENT CONTEXT:\nRecent Page States: {observation_summary}\nRecent Actions Taken: {action_summary}\nRecent Performance: {reflection_summary}\n\nGenerate a brief summary (2-5 sentences) that captures:\n1. Current task progress based on observations and actions taken\n2. Key insights from recent observations and performance patterns\n",
+        "variables": [
+          "user_goal", "total_steps", "observation_summary", "action_summary", "reflection_summary"
+        ],
+        "temperature": 0.7,
+        "max_tokens": 2048
+      },
+      "reflection_summarization": {
+        "name": "Reflection Summarization",
+        "task": "Generate intelligent summary of performance reflections",
+        "template": "Generate a concise but comprehensive summary of these performance reflections for context awareness.\n\nREFLECTION DATA:\n{reflections_text}\n\nFocus on:\n1. Overall effectiveness of recent actions and decision-making\n2. Detected execution patterns (repetitive actions, failures, stuck behaviors)\n3. Progress toward task completion and areas of success\n4. Potential issues or concerns that need attention\n5. Key insights that could improve future actions\n\nProvide a 3-4 sentence summary that captures the essential performance insights from these reflections that would be most useful for planning next actions in a web automation task:",
+        "variables": ["reflections_text"],
+        "temperature": 0.6,
+        "max_tokens": 2048
+      }
+    },
+    "planner_agent": {
+      "task_decomposition": {
+        "name": "Task Decomposition",
+        "task": "Decompose complex user goal into manageable subtasks",
+        "template": "Decompose the following web automation task into 3-5 manageable subtasks.\n\nUSER GOAL: {user_goal}\n\nCURRENT PAGE STATE:\n{current_page_text}\n\nAVAILABLE PAGE ELEMENTS:\n{page_elements}\n\nFocus on breaking down the goal into logical, sequential steps that can be executed through web browser interactions. Each subtask should:\n1. Be specific and actionable\n2. Represent a meaningful step toward the overall goal\n3. Be executable through web browser interactions\n4. Move the task forward in a logical sequence\n\nExamples of good subtasks:\n- \"Navigate to search functionality\"\n- \"Enter search query and review results\"\n- \"Locate and select relevant items\"\n- \"Complete purchase process\"\n- \"Extract and verify required information\"\n\nGenerate 3-5 subtasks, each on a new line:",
+        "variables": ["user_goal", "current_page_text", "page_elements"],
+        "temperature": 0.7,
+        "max_tokens": 2048
+      },
+      "current_state_analysis": {
+        "name": "Current State Analysis",
+        "task": "Analyze current state and determine next atomic action",
+        "template": "Analyze the current execution state briefly to determine which subtask is currently being worked on and what the next atomic action should be.\n\nUSER GOAL: {user_goal}\n\nTASK SUBTASKS:\n{subtasks}\n\nCURRENT PAGE STATE:\n{current_page_text}\n\nAVAILABLE PAGE ELEMENTS:\n{page_elements}\n\nRECENT CONTEXT:\nObservations Summary: {observation_summary}\nActions Summary: {action_summary}\nPerformance Summary: {reflection_summary}\n\nINSTRUCTIONS:\nYou must respond with a structured analysis using the following exact XML format:\n\n<think>\nYour step-by-step reasoning about the current state and next action\n</think>\n<current_subtask>\nThe exact subtask currently being worked on (must match one from the TASK SUBTASKS list)\n</current_subtask>\n<next_action>\nSpecific atomic action to execute next (e.g., \"click the search button\", \"type 'hello' into the input field\")\n</next_action>\n\nEXAMPLE:\n<think>\nThe user wants to search for products. We're currently on the homepage and need to start the search process. The first subtask is to navigate to search functionality, which we haven't completed yet.\n</think>\n<current_subtask>\nNavigate to search functionality\n</current_subtask>\n<next_action>\nClick on the search box to activate it\n</next_action>\n\nANOTHER EXAMPLE:\n<think>\nWe've successfully navigated to the search page and entered the query. Now we need to review the search results and select relevant items. This matches subtask 2.\n</think>\n<current_subtask>\nEnter search query and review results\n</current_subtask>\n<next_action>\nScroll down to view all search results\n</next_action>",
+        "variables": ["user_goal", "subtasks", "current_page_text", "page_elements", "observation_summary", "action_summary", "reflection_summary"],
+        "temperature": 0.6,
+        "max_tokens": 2048
+      }
+    },
+    "actor_agent": {
+      "action_execution": {
+        "name": "Browser Action Execution",
+        "task": "Generate specific browser actions to fulfill high-level intentions",
+        "template": "HIGH-LEVEL TASK INTENTION: {intention}\n\nCURRENT PAGE CONTEXT:\n{page_context}\n\nYour task is to execute specific browser actions to fulfill the stated intention.\n\nRequirements:\n1. Generate specific, actionable browser operations\n2. Use appropriate action types (CLICK, TYPE, GOTO, SCROLL, etc.)\n3. Include specific element identifiers when available\n4. Focus on efficiency and directness\n5. Handle any errors or page issues appropriately\n\n2. Generate specific, actionable browser operations\n3. Focus on completing the stated intention directly and efficiently\n\nExecute action: {intention}",
+        "variables": ["intention", "page_context"],
+        "temperature": 0.7,
+        "max_tokens": 2048
+      }
+    },
+    "reflector_agent": {
+      "action_validation": {
+        "name": "Action Execution Validation",
+        "task": "Validate whether web actions successfully completed their intended purpose",
+        "template": "Validate whether this web action successfully completed its intended purpose.\n\nINTENDED ACTION: {intended_action}\n\nEXECUTED ACTION:\n- Type: {action_type}\n- Element ID: {element_id}\n- Text: {action_text}\n\nBEFORE EXECUTION: {obs_before}...\nAFTER EXECUTION: {obs_after}...\n\nEvaluate:\n1. Did the action type match what was intended?\n2. Was the action executed successfully?\n3. Did the result show progress toward the intended action?\n4. Are there any error indicators in the result?\n\nProvide a validation result with:\n- success: true/false (Did it work as intended?)\n- confidence: 0.0-1.0 (How confident are you?)\n- reasoning: Brief explanation\n- issues: Any problems detected (list)",
+        "variables": ["intended_action", "action_type", "element_id", "action_text", "obs_before", "obs_after"],
+        "temperature": 0.3,
+        "max_tokens": 2048
+      },
+      "effectiveness_analysis": {
+        "name": "Action Effectiveness Analysis",
+        "task": "Analyze whether actions are making progress toward task completion",
+        "template": "Analyze the effectiveness of this web automation action in natural language.\n\nCURRENT INTENTION: {current_intention}\n\nEXECUTED ACTION:\n{latest_action}\n\nCURRENT PROGRESS METRICS:\n{context_summary}\n\nRECENT EXECUTION CONTEXT:\n{trajectory_summary}\n\nProvide a natural language analysis of the action's effectiveness. Focus on:\n1. Did it meaningfully progress the task?\n2. Was it the right action for the current situation?\n3. Did it avoid creating new problems?\n4. How well did it align with the intention?\n\nReturn a concise natural language assessment (2-4 sentences) describing whether the action was effective and why.",
+        "variables": ["current_intention", "latest_action", "context_summary", "trajectory_summary"],
+        "temperature": 0.5,
+        "max_tokens": 2048
+      },
+      "triple_summary": {
+        "name": "State Transition Triple Summary",
+        "task": "Generate enhanced summary of state transition (O_{t-1}, I_t, A_t, O_t)",
+        "template": "Generate an enhanced summary of this state transition in the web automation task.\n\nPREVIOUS OBSERVATION (O_{t-1}):\n{t-1}\n\nCURRENT INTENTION (I_t):\n{current_intention}\n\nEXECUTED ACTION (A_t):\n- Type: {action_type}\n- Element: {element_id}\n- Text: {action_text}\n\nCURRENT OBSERVATION (O_t):\n{current_observation}\n\nProvide a concise but informative summary that describes:\n1. What was the state before the action?\n2. What was the intention and action taken?\n3. What was the resulting state after the action?\n4. Did this represent meaningful progress toward the goal?\n\nGenerate a natural language summary (2-3 sentences) that captures the essence of this state transition.",
+        "variables": ["t-1", "current_intention", "action_type", "element_id", "action_text", "current_observation"],
+        "temperature": 0.6,
+        "max_tokens": 2048
+      }
+    }
+  }
+}

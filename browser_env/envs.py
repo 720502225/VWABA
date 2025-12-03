@@ -137,14 +137,17 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
         )
 
     @beartype
-    def setup(self, config_file: Path | None = None) -> None:
+    def setup(self, config_file: Path | None = None, instance_config: dict | None = None) -> None:
         self.context_manager = sync_playwright()
         self.playwright = self.context_manager.__enter__()
         self.browser = self.playwright.chromium.launch(
             headless=self.headless, slow_mo=self.slow_mo
         )
 
-        if config_file:
+        if instance_config is not None:
+            # Use provided instance config
+            pass
+        elif config_file:
             with open(config_file, "r") as f:
                 instance_config = json.load(f)
         else:
@@ -235,19 +238,26 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
         Reset the environment.
         :param options: options for the environment. The current supported options are:
             - "storage_state": the storage state of the browser. It is a file path to a json file.
+            - "start_url": the initial URL to navigate to.
         """
         super().reset(seed=seed, options=options)
         if self.reset_finished:
             self.context_manager.__exit__()
 
-        if options is not None and "config_file" in options:
+        if options is not None and "config_file" in options and options["config_file"] is not None:
             config_file = Path(options["config_file"])
             if config_file.exists():
                 self.setup(config_file=config_file)
             else:
                 raise ValueError(f"Config file {config_file} does not exist.")
         else:
-            self.setup()
+            # Create instance config from options
+            instance_config = {}
+            if options is not None:
+                # Copy all options to instance_config to maintain compatibility
+                # with original config file structure
+                instance_config.update(options)
+            self.setup(config_file=None, instance_config=instance_config)
         self.reset_finished = True
 
         self.page.wait_for_timeout(int(self.sleep_after_execution * 1000))

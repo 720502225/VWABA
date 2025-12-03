@@ -57,9 +57,11 @@ def get_render_action(
         case "som":
             text_meta_data = observation_metadata["text"]
             if action["element_id"] in text_meta_data["obs_nodes_info"]:
-                node_content = text_meta_data["obs_nodes_info"][
+                node_info = text_meta_data["obs_nodes_info"][
                     action["element_id"]
                 ]
+                # Extract the text representation from the node info
+                node_content = node_info.get("text", str(node_info))
             else:
                 node_content = "No match found"
 
