@@ -79,7 +79,7 @@
       "triple_summary": {
         "name": "State Transition Triple Summary",
         "task": "Generate enhanced summary of state transition (O_{t-1}, I_t, A_t, O_t)",
-        "template": "Generate an enhanced summary of this state transition in the web automation task.\n\nPREVIOUS OBSERVATION (O_{t-1}):\n{t-1}\n\nCURRENT INTENTION (I_t):\n{current_intention}\n\nEXECUTED ACTION (A_t):\n- Type: {action_type}\n- Element: {element_id}\n- Text: {action_text}\n\nCURRENT OBSERVATION (O_t):\n{current_observation}\n\nProvide a concise but informative summary that describes:\n1. What was the state before the action?\n2. What was the intention and action taken?\n3. What was the resulting state after the action?\n4. Did this represent meaningful progress toward the goal?\n\nGenerate a natural language summary (2-3 sentences) that captures the essence of this state transition.",
+        "template": "Generate an enhanced summary of this state transition in the web automation task.\n\nPREVIOUS OBSERVATION (O_[t-1]):\n{t-1}\n\nCURRENT INTENTION (I_t):\n{current_intention}\n\nEXECUTED ACTION (A_t):\n- Type: {action_type}\n- Element: {element_id}\n- Text: {action_text}\n\nCURRENT OBSERVATION (O_t):\n{current_observation}\n\nProvide a concise but informative summary that describes:\n1. What was the state before the action?\n2. What was the intention and action taken?\n3. What was the resulting state after the action?\n4. Did this represent meaningful progress toward the goal?\n\nGenerate a natural language summary (2-3 sentences) that captures the essence of this state transition.",
         "variables": ["t-1", "current_intention", "action_type", "element_id", "action_text", "current_observation"],
         "temperature": 0.6,
         "max_tokens": 2048

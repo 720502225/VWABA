@@ -108,8 +108,8 @@ class ReflectorAgent:
         # Get previous observation from trajectory
         obs_before = "No previous observation available"
         if len(trajectory) >= 2:
-            obs_before = trajectory[-2].get("observation", {}).get("text", "")[:200]
-            if len(trajectory[-2].get("observation", {}).get("text", "")) > 200:
+            obs_before = trajectory[-3].get("observation", {}).get("text", "")[:200]
+            if len(trajectory[-3].get("observation", {}).get("text", "")) > 200:
                 obs_before += "..."
 
         obs_after = current_observation.get("text", "")[:200]
