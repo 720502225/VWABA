@@ -447,9 +447,9 @@ class MultiAgentCoordinator:
                         # Determine if intention is fulfilled based on execution success
                         intention_fulfilled = reward == 1.0  # reward is 1.0 for success, 0.0 for failure
 
-                        # Update trajectory with new state
-                        state_info = {"observation": obs, "info": info}
-                        self.trajectory.append(state_info)
+                        # # Update trajectory with new state
+                        # state_info = {"observation": obs, "info": info}
+                        # self.trajectory.append(state_info)
 
                         print(f"✅ Browser execution successful - URL: {info.get('page', {}).url if 'page' in info else 'Unknown'}")
 
@@ -458,11 +458,13 @@ class MultiAgentCoordinator:
                         print(f"❌ Browser execution failed: {str(e)}")
                         intention_fulfilled = False
                         action_success = False
+                        info = None
                         new_observation = self.current_observation
                 else:
                     # No browser environment - simulate success for compatibility
                     intention_fulfilled = False  # Will be determined by reflection
                     action_success = True
+                    info = None
                     new_observation = self.current_observation
 
                 # Update execution result with browser execution results
@@ -477,6 +479,8 @@ class MultiAgentCoordinator:
                 }
                 self.actions.append(executed_action)
                 action_success = False
+                info = None
+                new_observation = self.current_observation
 
             # Show key actor execution information
             action_type = executed_action.get("action_type", "UNKNOWN")
@@ -505,6 +509,8 @@ class MultiAgentCoordinator:
             }
             self.actions.append(executed_action)
             action_success = False
+            info = None
+            new_observation = self.current_observation
 
             print(f"🎬 Actor Error: {str(e)[:100]}{'...' if len(str(e)) > 100 else ''}")
 
@@ -534,16 +540,21 @@ class MultiAgentCoordinator:
         # trajectory should contain: StateInfo, Action, StateInfo, Action, StateInfo...
         # trajectory[-1] should already be the current StateInfo, so we just add action and new state
         self.trajectory.append(executed_action)
+        if info is None:
+            info = {
+                "page": type('Page', (), {'url': ''})(),
+                "observation_metadata": {}
+            }
 
         # Create new state_info from new_observation
         new_state_info = {
             "observation": new_observation,  # new_observation is now observation format
-            "info": {
-                "page": type('Page', (), {'url': ''})(),
-                "observation_metadata": {}
-            }
+            "info": info
         }
         self.trajectory.append(new_state_info)
+        # print("===========" * 3)
+        # print("===========zbw debug: self.trajectory", self.trajectory)
+        # print("===========" * 3)
 
         # Update current observation to stay in sync with trajectory
         self.current_observation = new_observation

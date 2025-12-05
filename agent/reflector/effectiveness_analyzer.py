@@ -80,13 +80,21 @@ class EffectivenessAnalyzer:
         # Get last 3 action-observation pairs
         recent_steps = trajectory[-6:]  # Last 3 pairs (obs-action-obs-action-obs-action-obs)
 
-        for i, step in enumerate(recent_steps):
-            if i % 2 == 0:  # Observation step
-                obs_text = step.get("observation", {}).get("text", "")[:200]
-                context_parts.append(f"Page {i//2 + 1}: {obs_text}...")
-            else:  # Action step
-                action_type = step.get("action_type", "UNKNOWN")
-                element_id = step.get("element_id", "N/A")
-                context_parts.append(f"Action {i//2 + 1}: {action_type} on {element_id}")
+        page_count = 1
+        action_count = 1
+
+        for step in recent_steps:
+            if isinstance(step, dict):
+                # Check if it's an observation (StateInfo) by looking for 'observation' key
+                if 'observation' in step:
+                    obs_text = step.get("observation", {}).get("text", "")[:200]
+                    context_parts.append(f"Page {page_count}: {obs_text}...")
+                    page_count += 1
+                # Check if it's an action by looking for 'action_type' key
+                elif 'action_type' in step:
+                    action_type = step.get("action_type", "UNKNOWN")
+                    element_id = step.get("element_id", "N/A")
+                    context_parts.append(f"Action {action_count}: {action_type} on {element_id}")
+                    action_count += 1
 
         return " | ".join(context_parts)
