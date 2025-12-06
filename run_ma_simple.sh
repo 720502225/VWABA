@@ -29,6 +29,6 @@ echo "🧠 Model: deepseek-chat"
 python run_multi_agent.py \
   --start_url "https://www.baidu.com" \
   --intent "Search yaoming's age and shaquille o'neal's age, tell me the sum of their ages" \
-  --max_steps 2 \
+  --max_steps 3 \
   --config_file multi_agent_config_example.json
 

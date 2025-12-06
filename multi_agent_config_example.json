@@ -27,9 +27,9 @@
     "memory_dir": "agent_memories",
     "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
     "top_k": 3,
-    "window_size": 1,
-    "enable_memory": true,
-    "enable_memory_store": true
+    "window_size": 3,
+    "enable_memory": false,
+    "enable_memory_store": false
   },
   "output": {
     "result_dir": "demo_multi_agent",
