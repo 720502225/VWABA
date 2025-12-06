@@ -4,9 +4,7 @@
 # Usage: ./run_ma_simple.sh
 
 export DATASET=visualwebarena
-
-export DATASET=visualwebarena
-
+export HF_ENDPOINT=https://hf-mirror.com
 export CLASSIFIEDS="<your_classifieds_domain>:9980"
 export CLASSIFIEDS_RESET_TOKEN="4b61655535e7ed388f0d40a93600254c"  # Default reset token for classifieds site, change if you edited its docker-compose.yml
 export SHOPPING="<your_shopping_site_domain>:7770"
@@ -31,5 +29,6 @@ echo "🧠 Model: deepseek-chat"
 python run_multi_agent.py \
   --start_url "https://www.baidu.com" \
   --intent "Search yaoming's age and shaquille o'neal's age, tell me the sum of their ages" \
-  --max_steps 3 \
+  --max_steps 2 \
   --config_file multi_agent_config_example.json
+

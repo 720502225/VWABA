@@ -268,7 +268,11 @@ def test(args, config_file):
     )
 
     # Create multi-agent coordinator with browser environment
-    coordinator = MultiAgentCoordinator(lm_cfg, base_agent, browser_env=env, result_dir=result_dir)
+    coordinator = MultiAgentCoordinator(lm_cfg,
+                                        base_agent,
+                                        browser_env=env,
+                                        result_dir=result_dir,
+                                        memory_config=config.get('memory', {}))
 
     # Execute workflow with initial observation from browser
     # Use start_url from config if available
