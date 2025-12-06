@@ -42,6 +42,30 @@ class ContextAgent:
             self.memory_generator = MemoryGenerator(lm_config)
             self.window_size = memory_config.get('window_size', 3)
 
+
+    def update_state(self,
+        current_observation: Optional[Observation] = None,
+        latest_intention: Optional[str] = None,
+        latest_action: Optional[Action] = None,
+        latest_reflection: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Update context state."""
+        if current_observation and (not self.state_manager.get_all_observations() or
+                                   current_observation != self.state_manager.get_latest_observation()):
+            self.state_manager.add_observation(current_observation)
+
+        if latest_intention and (not self.state_manager.get_all_intentions() or
+                                 latest_intention != self.state_manager.get_all_intentions()[-1]):
+            self.state_manager.add_intention(latest_intention)
+
+        if latest_action and (not self.state_manager.get_all_actions() or
+                             latest_action != self.state_manager.get_latest_action()):
+            self.state_manager.add_action(latest_action)
+
+        if latest_reflection and (not self.state_manager.get_all_reflections() or
+                                 latest_reflection != self.state_manager.get_all_reflections()[-1]):
+            self.state_manager.add_reflection(latest_reflection)
+
     def update_context(
         self,
         trajectory: Trajectory,
@@ -64,21 +88,13 @@ class ContextAgent:
             Dictionary containing updated context information
         """
         # Update state manager with new information (avoid duplicates)
-        if current_observation and (not self.state_manager.get_all_observations() or
-                                   current_observation != self.state_manager.get_latest_observation()):
-            self.state_manager.add_observation(current_observation)
 
-        if latest_intention and (not self.state_manager.get_all_intentions() or
-                                 latest_intention != self.state_manager.get_all_intentions()[-1]):
-            self.state_manager.add_intention(latest_intention)
-
-        if latest_action and (not self.state_manager.get_all_actions() or
-                             latest_action != self.state_manager.get_latest_action()):
-            self.state_manager.add_action(latest_action)
-
-        if latest_reflection and (not self.state_manager.get_all_reflections() or
-                                 latest_reflection != self.state_manager.get_all_reflections()[-1]):
-            self.state_manager.add_reflection(latest_reflection)
+        self.update_state(
+            current_observation=current_observation,
+            latest_intention=latest_intention,
+            latest_action=latest_action,
+            latest_reflection=latest_reflection,
+        )
 
         # Get complete execution history
         history = self.state_manager.get_history()

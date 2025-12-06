@@ -211,9 +211,7 @@ class MultiAgentCoordinator:
                 continuation_decision = self.workflow_manager.should_continue_execution(context_summary)
 
                 if not continuation_decision["should_continue"]:
-                    self.context_agent.update_context(
-                        trajectory=self.trajectory,
-                        user_goal=self.user_goal,
+                    self.context_agent.update_state(
                         current_observation=self.current_observation,
                         latest_intention=self.intentions[-1] if self.intentions else None,
                         latest_action=self.actions[-1] if self.actions else None,
