@@ -41,12 +41,21 @@ class TaskDecomposer:
 
         memory = context_summary.get("memory_content", "")
         # Build decomposition prompt using template
-        prompt = load_prompt_template(
-            "planner_agent",
-            "task_decomposition",
-            user_goal=user_goal,
-            current_page_text=current_page_text,
-        )
+        if memory != "":
+            prompt = load_prompt_template(
+                "planner_agent",
+                "task_decomposition_w_mem",
+                memory=memory,
+                user_goal=user_goal,
+                current_page_text=current_page_text
+            )
+        else:
+            prompt = load_prompt_template(
+                "planner_agent",
+                "task_decomposition",
+                user_goal=user_goal,
+                current_page_text=current_page_text
+            )
 
         try:
             response = call_llm(
