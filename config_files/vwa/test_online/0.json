@@ -1,0 +1,44 @@
+{
+  "sites": [
+    "online-mind2web"
+  ],
+  "task_id": 0,
+  "require_login": false,
+  "storage_state": null,
+  "start_url": "https://www.amazon.com/",
+  "geolocation": null,
+  "intent_template": "Find a pair of wireless headphones on Amazon with active noise canceling for $100 or less and add them to the cart.",
+  "intent": "Find a pair of wireless headphones on Amazon with active noise canceling for $100 or less and add them to the cart like the input image.",
+  "image": "environment_docker\\webarena-homepage\\static\\input_images\\online-mind2web\\task0.png",
+  "instantiation_dict": {},
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "page_image_query"
+    ],
+    "page_image_query": [
+      {
+        "eval_image_url": "https://www.amazon.com/gp/cart/view.html?ref_=nav_cart",
+        "eval_image_class": ".fotorama__img",
+        "eval_vqa": [
+          {
+            "question": "Is this a pair of wireless headphones? (yes/no)",
+            "answer": "yes"
+          },
+          {
+            "question": "Is this with active noise canceling? (yes/no)",
+            "answer": "yes"
+          }
+        ]
+      }
+    ],
+    "reference_answers": null,
+    "reference_url": "https://www.amazon.com/gp/cart/view.html?ref_=nav_cart",
+    "program_html": []
+  },
+  "reasoning_difficulty": "easy",
+  "visual_difficulty": "medium",
+  "overall_difficulty": "easy",
+  "comments": "",
+  "intent_template_id": 0
+}
