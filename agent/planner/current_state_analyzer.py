@@ -60,7 +60,6 @@ class CurrentStateAnalyzer:
                 user_goal=user_goal,
                 subtasks=subtasks_str,
                 current_page_text=current_page_text,
-                page_elements=page_elements,
                 observation_summary=observation_summary,
                 action_summary=action_summary,
                 reflection_summary=reflection_summary
@@ -72,7 +71,6 @@ class CurrentStateAnalyzer:
                 user_goal=user_goal,
                 subtasks=subtasks_str,
                 current_page_text=current_page_text,
-                page_elements=page_elements,
                 observation_summary=observation_summary,
                 action_summary=action_summary,
                 reflection_summary=reflection_summary
