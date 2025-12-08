@@ -91,6 +91,9 @@ class PlannerAgent:
                 print(f"🎯 Planner Agent: No subtasks available, continuing with user goal: {user_goal}")
                 selected_intention = f"Continue working on: {user_goal}"
 
+        if self.current_step_index < len(self.subtasks) - 1:
+            self.current_step_index += 1
+
         # Build planning result with comprehensive information
         planning_result = {
             "intention": selected_intention,

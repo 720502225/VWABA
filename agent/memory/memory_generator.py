@@ -120,7 +120,7 @@ class MemoryGenerator:
             )
 
             # Generate initial memory using LLM
-            prompt =prompt = load_prompt_template(
+            prompt = load_prompt_template(
                 "memory_generator",
                 "memory_initial_generation",
                 user_goal=user_goal,
