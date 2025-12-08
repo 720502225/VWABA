@@ -41,7 +41,6 @@ class CurrentStateAnalyzer:
             obs_data = current_observation
 
         current_page_text = obs_data.get("text", "") if isinstance(obs_data, dict) else str(obs_data)
-        page_elements = self._extract_page_elements(obs_data)
 
         # Get context information
         observation_summary = context_summary.get("observation_summary", "")
@@ -57,7 +56,6 @@ class CurrentStateAnalyzer:
             user_goal=user_goal,
             subtasks=subtasks_str,
             current_page_text=current_page_text,
-            page_elements=page_elements,
             observation_summary=observation_summary,
             action_summary=action_summary,
             reflection_summary=reflection_summary
@@ -67,31 +65,15 @@ class CurrentStateAnalyzer:
             response = call_llm(
                 self.lm_config, [{"role": "user", "content": prompt}]
             ).strip()
-
             # Parse the LLM response into structured format
             analysis = self._parse_analysis_response(response, subtasks)
 
         except Exception as e:
             # Fallback analysis
+            print(f"🎯 Current State Analyzer: Error in analysis: {str(e)}")
             analysis = self._generate_fallback_analysis(user_goal, subtasks, str(e))
 
         return analysis
-
-    def _extract_page_elements(self, observation: Observation) -> str:
-        """Extract relevant page elements for analysis."""
-        # Try to get text representation with element IDs
-        obs_text = observation.get("text", "")
-
-        # Look for element IDs in the text (common pattern: [ID] description)
-        import re
-        elements = re.findall(r'\[\d+\][^\n]*', obs_text)
-
-        if elements:
-            # Limit to first 20 elements to avoid overwhelming context
-            elements = elements[:20]
-            return "Interactive Elements:\n" + "\n".join(f"• {elem}" for elem in elements)
-        else:
-            return "Page content detected but no specific interactive elements identified."
 
     def _parse_analysis_response(self, response: str, subtasks: List[str]) -> Dict[str, Any]:
         """Parse LLM state analysis response into structured format using XML tags."""
@@ -102,7 +84,6 @@ class CurrentStateAnalyzer:
             "current_subtask": "",
             "next_atomic_action": "",
             "reasoning": "",
-            "progress_assessment": "in_progress",
             "response": response
         }
 
@@ -119,11 +100,6 @@ class CurrentStateAnalyzer:
             next_action_match = re.search(r'<next_action>(.*?)</next_action>', response, re.DOTALL | re.IGNORECASE)
             if next_action_match:
                 analysis["next_atomic_action"] = next_action_match.group(1).strip()
-
-            # Check for completion status in reasoning or subtask content
-            combined_text = (analysis["reasoning"] + analysis["current_subtask"] + analysis["next_atomic_action"]).lower()
-            if any(keyword in combined_text for keyword in ['complete', 'finished', 'done', 'all tasks completed']):
-                analysis["progress_assessment"] = "completed"
 
         except Exception as e:
             # If parsing fails, fall back to using the entire response
@@ -147,6 +123,7 @@ class CurrentStateAnalyzer:
 
         # If no next action extracted, use a simple fallback
         if not analysis["next_atomic_action"]:
+            print(f"🎯 Current State Analyzer: No next atomic action extracted, using current subtask: {analysis['current_subtask']}")
             analysis["next_atomic_action"] = f"Continue working on: {analysis['current_subtask']}"
 
         return analysis
@@ -165,6 +142,5 @@ class CurrentStateAnalyzer:
         return {
             "current_subtask": current_subtask,
             "next_atomic_action": next_action,
-            "reasoning": f"Fallback analysis due to error: {error}",
-            "progress_assessment": "in_progress"
+            "reasoning": f"Fallback analysis due to error: {error}"
         }

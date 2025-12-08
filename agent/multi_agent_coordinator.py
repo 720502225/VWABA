@@ -159,13 +159,21 @@ class MultiAgentCoordinator:
                 # start_observation is already in StateInfo format: {"observation": obs, "info": info}
                 initial_observation = start_observation["observation"]
                 initial_info = start_observation["info"]
-            else:
-                # start_observation is the observation itself
-                initial_observation = start_observation
-                # Ensure observation is a dict with "text" key for text-only models
+                # Ensure observation has both text and image fields
                 if isinstance(initial_observation, dict):
                     if "text" not in initial_observation:
                         initial_observation["text"] = ""
+                    if "image" not in initial_observation:
+                        initial_observation["image"] = None
+            else:
+                # start_observation is the observation itself
+                initial_observation = start_observation
+                # Ensure observation is a dict with "text" and "image" keys
+                if isinstance(initial_observation, dict):
+                    if "text" not in initial_observation:
+                        initial_observation["text"] = ""
+                    if "image" not in initial_observation:
+                        initial_observation["image"] = None
                 else:
                     initial_observation = {"text": str(initial_observation) if initial_observation else "", "image": None}
 
@@ -351,7 +359,6 @@ class MultiAgentCoordinator:
             current_subtask = planning_result.get("current_subtask", "")
             next_atomic_action = planning_result.get("next_atomic_action", "")
             reasoning = planning_result.get("reasoning", "")
-            progress_assessment = planning_result.get("progress_assessment", "in_progress")
             all_subtasks = planning_result.get("all_subtasks", [])
             current_step_index = planning_result.get("current_step_index", 0)
             total_subtasks = planning_result.get("total_subtasks", 0)
@@ -359,7 +366,7 @@ class MultiAgentCoordinator:
             print(f"🎯 Current Subtask: {current_subtask[:100]}{'...' if len(current_subtask) > 100 else ''}")
             if next_atomic_action != current_subtask:
                 print(f"🎯 Next Atomic Action: {next_atomic_action[:100]}{'...' if len(next_atomic_action) > 100 else ''}")
-            print(f"🎯 Progress: Step {current_step_index + 1}/{total_subtasks} - {progress_assessment}")
+            print(f"🎯 Progress: Step {current_step_index + 1}/{total_subtasks}")
 
             # Show all subtasks overview
             if all_subtasks and total_subtasks > 0:
@@ -378,7 +385,6 @@ class MultiAgentCoordinator:
                 "current_subtask": current_subtask,
                 "next_atomic_action": next_atomic_action,
                 "reasoning": reasoning,
-                "progress_assessment": progress_assessment,
                 "all_subtasks": all_subtasks,
                 "current_step_index": current_step_index,
                 "total_subtasks": total_subtasks,
@@ -394,7 +400,6 @@ class MultiAgentCoordinator:
                 "current_subtask": f"Continue working on: {self.user_goal}",
                 "next_atomic_action": f"Continue working on: {self.user_goal}",
                 "reasoning": f"Fallback intention due to error: {str(e)}",
-                "progress_assessment": "in_progress",
                 "all_subtasks": [f"Complete the task: {self.user_goal}"],
                 "current_step_index": 0,
                 "total_subtasks": 1,
@@ -408,7 +413,6 @@ class MultiAgentCoordinator:
                 "current_subtask": planning_result["current_subtask"],
                 "next_atomic_action": planning_result["next_atomic_action"],
                 "reasoning": planning_result["reasoning"],
-                "progress_assessment": planning_result["progress_assessment"],
                 "task_decomposed": planning_result["task_decomposed"]
             }
             self.log_agent_response("planner_agent", step_number, error_response)
@@ -421,9 +425,17 @@ class MultiAgentCoordinator:
             meta_data_for_action = self.meta_data.copy()
             meta_data_for_action["step_number"] = step_number
             
+            # Ensure current_observation has both text and image fields
+            current_obs = self.current_observation or {"text": "", "image": None}
+            if isinstance(current_obs, dict):
+                if "text" not in current_obs:
+                    current_obs["text"] = ""
+                if "image" not in current_obs:
+                    current_obs["image"] = None
+            
             execution_result = self.actor_agent.execute_intention(
                 intention=current_intention,
-                current_observation=self.current_observation or {"text": "", "image": None},
+                current_observation=current_obs,
                 trajectory=self.trajectory,
                 meta_data=meta_data_for_action,
                 images=images,
@@ -439,6 +451,15 @@ class MultiAgentCoordinator:
                     try:
                         print(f"🔍 Executing action in browser: {executed_action.get('action_type', 'UNKNOWN')}")
                         obs, reward, terminated, truncated, info = self.browser_env.step(executed_action)
+
+                        # Ensure observation has both text and image fields
+                        if isinstance(obs, dict):
+                            if "text" not in obs:
+                                obs["text"] = ""
+                            if "image" not in obs:
+                                obs["image"] = None
+                        else:
+                            obs = {"text": str(obs) if obs else "", "image": None}
 
                         # Update current observation with new browser state
                         self.current_observation = obs  # Keep as observation format

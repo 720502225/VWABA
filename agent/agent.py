@@ -132,9 +132,14 @@ class PromptAgent(Agent):
         # Create page screenshot image for multimodal models.
         if self.multimodal_inputs:
             page_screenshot_arr = trajectory[-1]["observation"]["image"]
-            page_screenshot_img = Image.fromarray(
-                page_screenshot_arr
-            )  # size = (viewport_width, viewport_width)
+            if page_screenshot_arr is not None:
+                page_screenshot_img = Image.fromarray(
+                    page_screenshot_arr
+                )  # size = (viewport_width, viewport_width)
+            else:
+                # Fallback: create empty image if image is None
+                print("WARNING: No page screenshot image found, creating empty image.")
+                page_screenshot_img = Image.new('RGB', (1280, 720), color='white')
 
         # Caption the input image, if provided.
         if images is not None and len(images) > 0:

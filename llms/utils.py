@@ -28,7 +28,7 @@ def call_llm(
             # Safely get configuration parameters with defaults
             temperature = lm_config.gen_config.get("temperature", 1.0)
             top_p = lm_config.gen_config.get("top_p", 0.9)
-            context_length = lm_config.gen_config.get("context_length", 0)
+            context_length = lm_config.gen_config.get("context_length", 4096)
             max_tokens = lm_config.gen_config.get("max_tokens", 384)
             stop_token = lm_config.gen_config.get("stop_token", None)
 

@@ -74,7 +74,6 @@ class PlannerAgent:
         current_subtask = state_analysis.get("current_subtask", "")
         next_atomic_action = state_analysis.get("next_atomic_action", "")
         reasoning = state_analysis.get("reasoning", "")
-        progress_assessment = state_analysis.get("progress_assessment", "in_progress")
         response = state_analysis.get("response", "")
 
         # Create the intention for the Actor Agent
@@ -88,11 +87,8 @@ class PlannerAgent:
             if self.current_step_index < len(self.subtasks):
                 selected_intention = self.subtasks[self.current_step_index]
             else:
+                print(f"🎯 Planner Agent: No subtasks available, continuing with user goal: {user_goal}")
                 selected_intention = f"Continue working on: {user_goal}"
-
-        # Update step index if task is completed
-        if progress_assessment == "completed" and self.current_step_index < len(self.subtasks) - 1:
-            self.current_step_index += 1
 
         # Build planning result with comprehensive information
         planning_result = {
@@ -100,7 +96,6 @@ class PlannerAgent:
             "current_subtask": current_subtask,
             "next_atomic_action": next_atomic_action,
             "reasoning": reasoning,
-            "progress_assessment": progress_assessment,
             "all_subtasks": self.subtasks,
             "current_step_index": self.current_step_index,
             "total_subtasks": len(self.subtasks),

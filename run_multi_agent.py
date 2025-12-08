@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import torch
+
 from browser_env import (
     ScriptBrowserEnv,
     Action,
@@ -19,10 +21,11 @@ from browser_env.utils import Observation
 from agent import PromptAgent
 from llms import lm_config, call_llm
 from PIL import Image
+from evaluation_harness import image_utils
 
 # Import the full multi-agent coordinator
 from agent.multi_agent_coordinator import MultiAgentCoordinator
-from agent.prompts.prompt_constructor import PromptConstructor
+from agent.prompts.prompt_constructor import PromptConstructor, DirectPromptConstructor, CoTPromptConstructor, MultimodalCoTPromptConstructor
 from llms import lm_config
 
 
@@ -221,42 +224,85 @@ def test(args, config_file):
             mode=config.get('model', {}).get('mode', 'chat')
         )
 
-    # Create browser environment (similar to run.py)
-    from browser_env import ScriptBrowserEnv
-    from browser_env.utils import Observation
-    from typing import Optional
-
     # Get browser environment configuration
     browser_config = config.get('browser', {})
+    observation_type = browser_config.get('observation_type', 'accessibility_tree')
+    
+    # Load captioning model if needed (similar to run.py)
+    caption_image_fn = None
+    if observation_type in [
+        "accessibility_tree_with_captioner",
+        "image_som",
+    ]:
+        device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
+        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+        captioning_model = config.get('model', {}).get('captioning_model', 'Salesforce/blip2-flan-t5-xl')
+        caption_image_fn = image_utils.get_captioning_fn(
+            device, dtype, captioning_model
+        )
+
     # Build viewport_size from config
     viewport_size = {
         "width": browser_config.get('viewport_width', 1280),
         "height": browser_config.get('viewport_height', 720),
     }
 
+    # Create browser environment
     env = ScriptBrowserEnv(
         headless=browser_config.get('headless', False),  # Set to False for debugging
         slow_mo=browser_config.get('slow_mo', 100),
-        observation_type=browser_config.get('observation_type', 'accessibility_tree'),
+        observation_type=observation_type,
         current_viewport_only=browser_config.get('current_viewport_only', True),
         viewport_size=viewport_size,
         save_trace_enabled=browser_config.get('save_trace_enabled', True),
         sleep_after_execution=browser_config.get('sleep_after_execution', 0.5),
+        captioning_fn=caption_image_fn,
     )
 
-    # Create prompt constructor for multi-agent system using existing framework
-    from agent.prompts.prompt_constructor import DirectPromptConstructor
+    # Determine if model is multimodal and select appropriate prompt constructor
     from llms.tokenizers import Tokenizer
-
-    # Get instruction path from config or use default
-    instruction_path = config.get('instruction_path') or 'agent/prompts/jsons/p_cot_id_actree_3s.json'
-
-    # Create prompt constructor using existing DirectPromptConstructor
-    prompt_constructor = DirectPromptConstructor(
-        instruction_path=instruction_path,
-        lm_config=lm_cfg,
-        tokenizer=Tokenizer(lm_cfg.provider, lm_cfg.model)
+    
+    model_name = lm_cfg.model.lower()
+    is_multimodal_model = (
+        "gemini" in model_name or 
+        ("gpt-4" in model_name and "vision" in model_name)
     )
+    is_image_observation = observation_type in ["image", "image_som"]
+    
+    # Get instruction path from config or use default
+    instruction_path = config.get('instruction_path')
+    if not instruction_path:
+        # Select default instruction path based on observation type and model
+        if is_multimodal_model and is_image_observation:
+            instruction_path = 'agent/prompts/jsons/p_multimodal_cot_id_actree_3s.json'
+        else:
+            instruction_path = 'agent/prompts/jsons/p_cot_id_actree_3s.json'
+    
+    # Load instruction to check prompt_constructor type
+    with open(instruction_path) as f:
+        instruction_data = json.load(f)
+        constructor_type = instruction_data.get("meta_data", {}).get("prompt_constructor", "DirectPromptConstructor")
+    
+    # Create appropriate prompt constructor
+    tokenizer = Tokenizer(lm_cfg.provider, lm_cfg.model)
+    if constructor_type == "MultimodalCoTPromptConstructor":
+        prompt_constructor = MultimodalCoTPromptConstructor(
+            instruction_path=instruction_path,
+            lm_config=lm_cfg,
+            tokenizer=tokenizer
+        )
+    elif constructor_type == "CoTPromptConstructor":
+        prompt_constructor = CoTPromptConstructor(
+            instruction_path=instruction_path,
+            lm_config=lm_cfg,
+            tokenizer=tokenizer
+        )
+    else:
+        prompt_constructor = DirectPromptConstructor(
+            instruction_path=instruction_path,
+            lm_config=lm_cfg,
+            tokenizer=tokenizer
+        )
 
     # Create base prompt agent for multi-agent coordinator
     # Use action_set_tag from configuration instead of hardcoding
@@ -265,6 +311,7 @@ def test(args, config_file):
         action_set_tag=action_set_tag,
         lm_config=lm_cfg,
         prompt_constructor=prompt_constructor,
+        captioning_fn=caption_image_fn if observation_type == "accessibility_tree_with_captioner" else None,
     )
 
     # Create multi-agent coordinator with browser environment

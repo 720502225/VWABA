@@ -37,15 +37,13 @@ class TaskDecomposer:
             obs_data = current_observation
 
         current_page_text = obs_data.get("text", "") if isinstance(obs_data, dict) else str(obs_data)
-        page_elements = self._extract_page_elements(obs_data)
 
         # Build decomposition prompt using template
         prompt = load_prompt_template(
             "planner_agent",
             "task_decomposition",
             user_goal=user_goal,
-            current_page_text=current_page_text,
-            page_elements=page_elements
+            current_page_text=current_page_text
         )
 
         try:
@@ -61,22 +59,6 @@ class TaskDecomposer:
             decomposition = self._generate_fallback_decomposition(user_goal, str(e))
 
         return decomposition
-
-    def _extract_page_elements(self, observation: Observation) -> str:
-        """Extract relevant page elements for analysis."""
-        # Try to get text representation with element IDs
-        obs_text = observation.get("text", "")
-
-        # Look for element IDs in the text (common pattern: [ID] description)
-        import re
-        elements = re.findall(r'\[\d+\][^\n]*', obs_text)
-
-        if elements:
-            # Limit to first 20 elements to avoid overwhelming context
-            elements = elements[:20]
-            return "Interactive Elements:\n" + "\n".join(f"• {elem}" for elem in elements)
-        else:
-            return "Page content detected but no specific interactive elements identified."
 
     def _parse_decomposition_response(self, response: str) -> Dict[str, Any]:
         """Parse LLM task decomposition response into structured format."""
