@@ -39,14 +39,21 @@ class MultiAgentCoordinator:
     to achieve complex web automation tasks through coordinated execution.
     """
 
-    def __init__(self, lm_config: lm_config.LMConfig, existing_prompt_agent, browser_env=None, result_dir: str = "results") -> None:
+    def __init__(self, lm_config: lm_config.LMConfig,
+                 existing_prompt_agent,
+                 browser_env=None,
+                 result_dir: str = "results",
+                 memory_config: Dict[str, Any]= {}) -> None:
         self.lm_config = lm_config
 
         # Get action set tag from existing agent or use default
         action_set_tag = getattr(existing_prompt_agent, 'action_set_tag', 'som')
 
-        # Initialize individual agents
-        self.context_agent = ContextAgent(lm_config)
+        self.enable_memory = memory_config.get("enable_memory", False)
+        self.enable_memory_store = memory_config.get("enable_memory_store", False)
+
+        # Initialize individual agents with memory enabled if specified
+        self.context_agent = ContextAgent(lm_config, memory_config)
         self.planner_agent = PlannerAgent(lm_config)
         self.actor_agent = ActorAgent(
             action_set_tag=action_set_tag,
@@ -147,6 +154,17 @@ class MultiAgentCoordinator:
         self.communication_hub.update_shared_context("user_goal", user_goal)
         self.communication_hub.update_shared_context("max_steps", max_steps)
 
+        if self.enable_memory:
+            # Initialize memory system for this task
+            print("🧠 Initializing memory system...")
+            memory_initialization = self.context_agent.initialize_task_memory(user_goal)
+            if memory_initialization.get("relevant_memories"):
+                print(f"📚 Found {len(memory_initialization['relevant_memories'])} relevant memories")
+                if memory_initialization.get("memory_content"):
+                    print(f"📝 Memory content: {memory_initialization['memory_content'][:100]}...")
+            else:
+                print("📚 No relevant memories found for this task")
+
         # Initialize trajectory with initial state
         # This is required because DirectPromptConstructor expects trajectory[-1] to exist
         if not self.trajectory:
@@ -201,6 +219,12 @@ class MultiAgentCoordinator:
                 continuation_decision = self.workflow_manager.should_continue_execution(context_summary)
 
                 if not continuation_decision["should_continue"]:
+                    self.context_agent.update_state(
+                        current_observation=self.current_observation,
+                        latest_intention=self.intentions[-1] if self.intentions else None,
+                        latest_action=self.actions[-1] if self.actions else None,
+                        latest_reflection=self.reflections[-1] if self.reflections else None,
+                    )
                     break
 
                 # Handle intervention requirements
@@ -232,6 +256,10 @@ class MultiAgentCoordinator:
 
         # Log final execution summary - use context agent completion check
         task_completed = self.context_agent.check_task_completion(self.user_goal)
+
+        if self.enable_memory_store:
+            self.context_agent.generate_and_store_memory(task_completed)
+
         final_summary = {
             "total_steps_executed": len(self.actions),
             "task_completed": task_completed,
@@ -296,6 +324,7 @@ class MultiAgentCoordinator:
                 trajectory=self.trajectory,
                 user_goal=self.user_goal,
                 current_observation=self.current_observation,
+                latest_intention=self.intentions[-1] if self.intentions else None,
                 latest_action=self.actions[-1] if self.actions else None,
                 latest_reflection=self.reflections[-1] if self.reflections else None,
             )
@@ -573,9 +602,6 @@ class MultiAgentCoordinator:
             "info": info
         }
         self.trajectory.append(new_state_info)
-        # print("===========" * 3)
-        # print("===========zbw debug: self.trajectory", self.trajectory)
-        # print("===========" * 3)
 
         # Update current observation to stay in sync with trajectory
         self.current_observation = new_observation

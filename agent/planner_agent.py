@@ -52,6 +52,7 @@ class PlannerAgent:
             decomposition_result = self.task_decomposer.decompose_task(
                 user_goal=user_goal,
                 current_observation=current_observation or {"text": ""},
+                context_summary=context_summary,
             )
             self.subtasks = decomposition_result.get("subtasks", [])
             self.task_decomposed = True

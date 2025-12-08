@@ -17,6 +17,7 @@ class TaskDecomposer:
         self,
         user_goal: str,
         current_observation: Observation,
+        context_summary: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Decompose user goal into 3-5 manageable subtasks.
 
@@ -38,12 +39,13 @@ class TaskDecomposer:
 
         current_page_text = obs_data.get("text", "") if isinstance(obs_data, dict) else str(obs_data)
 
+        memory = context_summary.get("memory_content", "")
         # Build decomposition prompt using template
         prompt = load_prompt_template(
             "planner_agent",
             "task_decomposition",
             user_goal=user_goal,
-            current_page_text=current_page_text
+            current_page_text=current_page_text,
         )
 
         try:
