@@ -51,17 +51,33 @@ class CurrentStateAnalyzer:
         # Build state analysis prompt using template
         subtasks_str = "\n".join([f"{i+1}. {subtask}" for i, subtask in enumerate(subtasks)])
 
-        prompt = load_prompt_template(
-            "planner_agent",
-            "current_state_analysis",
-            user_goal=user_goal,
-            subtasks=subtasks_str,
-            current_page_text=current_page_text,
-            page_elements=page_elements,
-            observation_summary=observation_summary,
-            action_summary=action_summary,
-            reflection_summary=reflection_summary
-        )
+        memory = context_summary.get("memory_content", "")
+        # Build decomposition prompt using template
+        if memory != "":
+            prompt = load_prompt_template(
+                "planner_agent",
+                "current_state_analysis_w_mem",
+                memory=memory,
+                user_goal=user_goal,
+                subtasks=subtasks_str,
+                current_page_text=current_page_text,
+                page_elements=page_elements,
+                observation_summary=observation_summary,
+                action_summary=action_summary,
+                reflection_summary=reflection_summary
+            )
+        else:
+            prompt = load_prompt_template(
+                "planner_agent",
+                "current_state_analysis",
+                user_goal=user_goal,
+                subtasks=subtasks_str,
+                current_page_text=current_page_text,
+                page_elements=page_elements,
+                observation_summary=observation_summary,
+                action_summary=action_summary,
+                reflection_summary=reflection_summary
+            )
 
         try:
             response = call_llm(
