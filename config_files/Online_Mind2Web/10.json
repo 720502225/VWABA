@@ -1,0 +1,7 @@
+{
+  "intent": "Find the shipping cost of a Common medium-sized box in flat-rate shipping and compare it with other parcel services.",
+  "task_id": "92160852a6bbbc165cee4e14ab0b1d59",
+  "start_url": "https://www.ups.com/",
+  "storage_state": null,
+  "image": null
+}

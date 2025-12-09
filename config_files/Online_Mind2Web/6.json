@@ -1,0 +1,7 @@
+{
+  "intent": "Find the most cited publication at the 2022 CVPR main conference.",
+  "task_id": "5d542a7ec1fa142ba73cc87d970caf39",
+  "start_url": "https://dblp.org/",
+  "storage_state": null,
+  "image": null
+}

@@ -26,9 +26,10 @@ import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+import nest_asyncio
+nest_asyncio.apply()
 
-
-def build_vwa_args(result_dir: str) -> SimpleNamespace:
+def build_vwa_args(result_dir: str, test_start_idx: int = 1, test_end_idx: int = 3) -> SimpleNamespace:
     # Minimal args needed by run.prepare and run.test
     ns = SimpleNamespace()
     ns.render = False
@@ -42,7 +43,7 @@ def build_vwa_args(result_dir: str) -> SimpleNamespace:
     ns.sleep_after_execution = 0.0
     ns.max_steps = 30
     ns.agent_type = "prompt"
-    ns.instruction_path = "agents/prompts/state_action_agent.json"
+    ns.instruction_path = "agent/prompts/jsons/p_cot_id_actree_3s.json"
     ns.parsing_failure_th = 3
     ns.repeating_action_failure_th = 5
     ns.test_config_base_dir = "configs"
@@ -59,51 +60,71 @@ def build_vwa_args(result_dir: str) -> SimpleNamespace:
     ns.stop_token = None
     ns.max_retry = 1
     ns.max_obs_length = 3840
-    ns.test_start_idx = 0
-    ns.test_end_idx = 0
+    ns.test_start_idx = test_start_idx
+    ns.test_end_idx = test_end_idx
     ns.result_dir = result_dir
     ns.render_screenshot = True
     ns.save_trace_enabled = True
     return ns
 
 
-def write_task_configs(tasks, configs_dir: Path, max_tasks: int | None = None):
+def write_task_configs(tasks, configs_dir: Path, start_idx: int, end_idx: int):
+    """Write per-task config files for tasks in index range [start_idx, end_idx].
+
+    Filenames are generated sequentially starting from 0.json for the first
+    selected task.
+    """
     configs_dir.mkdir(parents=True, exist_ok=True)
     config_paths = []
-    for i, t in enumerate(tasks):
-        if max_tasks and i >= max_tasks:
-            break
+    total = len(tasks)
+
+    if start_idx is None:
+        start_idx = 0
+    if end_idx is None or end_idx < start_idx:
+        end_idx = start_idx
+
+    # clamp indices
+    start_idx = max(0, start_idx)
+    end_idx = min(end_idx, total - 1)
+
+    counter = 0
+    for idx in range(start_idx, end_idx + 1):
+        t = tasks[idx]
         task_id = t.get("task_id")
         intent = t.get("confirmed_task") or t.get("task") or t.get("confirmed_task")
         cfg = {
             "intent": intent,
             "task_id": task_id,
+            "start_url": t.get("website"),
             # leave storage_state empty to skip auto-login
-            "storage_state": "",
+            "storage_state": None,
             # no input images by default
             "image": None,
         }
-        cfg_path = configs_dir / f"{i}.json"
+        cfg_path = configs_dir / f"{counter}.json"
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=2)
         config_paths.append(str(cfg_path))
+        counter += 1
+
     return config_paths
 
 
 def run_vwa_agent(config_paths, vwa_args):
     # Import local run module (must be executed from repo root)
-    import run as vwa_run
+    import run_omw as vwa_run
 
     # Prepare result dir etc
-    vwa_run.prepare(vwa_args)
+    #vwa_run.prepare(vwa_args)
 
     # call test() with list
-    vwa_run.test(vwa_args, config_paths)
+    task_dir = vwa_run.test(vwa_args, config_paths)
+    return task_dir
 
 
 def convert_results(result_dir: str, converted_dir: str):
     # Use the converter script we added earlier
-    script = Path("Online-Mind2Web/script/convert_vwa_to_online_mind2web.py")
+    script = Path("Online-Mind2Web/script/convert.py")
     if not script.exists():
         raise FileNotFoundError(f"Converter script not found: {script}")
     cmd = [sys.executable, str(script), "--input_dir", str(result_dir), "--output_dir", str(converted_dir)]
@@ -111,12 +132,12 @@ def convert_results(result_dir: str, converted_dir: str):
     subprocess.check_call(cmd)
 
 
-def run_online_mind2web_eval(converted_dir: str, api_key: str, model: str = "gpt-4o", output_dir: str | None = None, score_threshold: int = 3, num_worker: int = 1, base_url: str | None = None):
+def run_online_mind2web_eval(converted_dir: str, api_key: str, model: str = "qwen-plus", output_dir: str | None = None, score_threshold: int = 3, num_worker: int = 1, base_url: str | None = None):
     omw_run = Path("Online-Mind2Web/src/run.py")
     if not omw_run.exists():
         raise FileNotFoundError(f"Online-Mind2Web run.py not found: {omw_run}")
     if output_dir is None:
-        output_dir = f"{converted_dir}_result"
+        output_dir = f"{converted_dir}/result"
 
     cmd = [sys.executable, str(omw_run), "--mode", "WebJudge_Online_Mind2Web_eval", "--model", model, "--trajectories_dir", str(converted_dir), "--api_key", api_key, "--output_path", str(output_dir), "--num_worker", str(num_worker), "--score_threshold", str(score_threshold)]
     if base_url:
@@ -129,15 +150,27 @@ def run_online_mind2web_eval(converted_dir: str, api_key: str, model: str = "gpt
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tasks", type=str, default="success_tasks.json", help="Path to success_tasks.json")
-    parser.add_argument("--max_tasks", type=int, default=0)
-    parser.add_argument("--result_dir", type=str, default="vwa_results")
-    parser.add_argument("--converted_dir", type=str, default="Online-Mind2Web/data/example")
-    parser.add_argument("--omw_api_key", type=str, required=True, help="Online-Mind2Web OpenAI API key")
+    parser.add_argument("--test_start_idx", type=int, default=0, help="Start task index (inclusive) for processing")
+    parser.add_argument("--test_end_idx", type=int, default=0, help="End task index (inclusive) for processing")
+    parser.add_argument("--result_dir", type=str, default="omw_results")
+    parser.add_argument("--converted_dir", type=str, default="Online-Mind2Web/data")
+    parser.add_argument("--omw_api_key", type=str, help="Online-Mind2Web OpenAI API key")
     parser.add_argument("--omw_model", type=str, default="qwen-plus")
     parser.add_argument("--score_threshold", type=int, default=3)
     parser.add_argument("--num_worker", type=int, default=1)
     parser.add_argument("--base_url", type=str, default=None)
     args = parser.parse_args()
+
+    # Fallback: read API key and base_url from environment variables if not provided
+    if not args.omw_api_key:
+        args.omw_api_key = os.environ.get("OPENAI_API_KEY")
+
+    if not args.base_url:
+        args.base_url = os.environ.get("OPENAI_BASE_URL")
+
+    if not args.omw_api_key:
+        print("Error: Online-Mind2Web API key not provided. Set --omw_api_key or environment variable OPENAI_KEY.")
+        return
 
     tasks_path = Path(args.tasks)
     if not tasks_path.exists():
@@ -148,29 +181,31 @@ def main():
         tasks = json.load(f)
 
     # prepare config directory
-    configs_dir = Path("configs")
+    configs_dir = Path("config_files/Online_Mind2Web")
     if configs_dir.exists():
         # keep prior configs but we will overwrite
         pass
     else:
         configs_dir.mkdir(parents=True)
 
-    max_tasks = args.max_tasks if args.max_tasks > 0 else None
-    config_paths = write_task_configs(tasks, configs_dir, max_tasks=max_tasks)
+    # Use start/end indices to select tasks
+    start_idx = args.test_start_idx
+    end_idx = args.test_end_idx
+    config_paths = write_task_configs(tasks, configs_dir, start_idx=start_idx, end_idx=end_idx)
 
     # build args for VWA run
-    vwa_args = build_vwa_args(args.result_dir)
+    vwa_args = build_vwa_args(args.result_dir, test_start_idx=args.test_start_idx, test_end_idx=args.test_end_idx)
     # ensure result_dir exists
     Path(args.result_dir).mkdir(parents=True, exist_ok=True)
 
-    print(f"Running VWA agent on {len(config_paths)} tasks, results -> {args.result_dir}")
-    run_vwa_agent(config_paths, vwa_args)
+    print(f"Running agent on {len(config_paths)} tasks, results -> {args.result_dir}")
+    task_dir = run_vwa_agent(config_paths, vwa_args)
 
-    print("Converting results to Online-Mind2Web format...")
-    convert_results(args.result_dir, args.converted_dir)
+    #print("Converting results to Online-Mind2Web format...")
+    #convert_results(args.result_dir, args.converted_dir)
 
     print("Running Online-Mind2Web WebJudge_Online_Mind2Web_eval...")
-    run_online_mind2web_eval(args.converted_dir, api_key=args.omw_api_key, model=args.omw_model, score_threshold=args.score_threshold, num_worker=args.num_worker, base_url=args.base_url)
+    run_online_mind2web_eval(task_dir, api_key=args.omw_api_key, model=args.omw_model, score_threshold=args.score_threshold, num_worker=args.num_worker, base_url=args.base_url)
 
 
 if __name__ == "__main__":
