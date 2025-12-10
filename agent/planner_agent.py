@@ -83,6 +83,11 @@ class PlannerAgent:
             selected_intention = next_atomic_action
         elif current_subtask:
             selected_intention = current_subtask
+            # Update current_step_index to match the LLM-determined current subtask
+            # Try to find the matching subtask, handling cases where LLM adds numbering prefixes
+            matched_index = self._find_subtask_index(current_subtask)
+            if matched_index is not None:
+                self.current_step_index = matched_index
         else:
             # Fallback intention
             if self.current_step_index < len(self.subtasks):
@@ -90,9 +95,6 @@ class PlannerAgent:
             else:
                 print(f"🎯 Planner Agent: No subtasks available, continuing with user goal: {user_goal}")
                 selected_intention = f"Continue working on: {user_goal}"
-
-        if self.current_step_index < len(self.subtasks) - 1:
-            self.current_step_index += 1
 
         # Build planning result with comprehensive information
         planning_result = {
@@ -197,3 +199,43 @@ class PlannerAgent:
         elif self.current_step_index == len(self.subtasks) - 1:
             self.current_step_index += 1  # Mark as beyond the end
             print("🎯 All subtasks marked as completed")
+
+    def _find_subtask_index(self, current_subtask: str) -> Optional[int]:
+        """Find the index of a subtask, handling cases where LLM adds numbering prefixes.
+
+        Args:
+            current_subtask: The subtask text from LLM analysis (may include numbering)
+
+        Returns:
+            Index of the matching subtask, or None if not found
+        """
+        # First try exact match
+        if current_subtask in self.subtasks:
+            return self.subtasks.index(current_subtask)
+
+        # Try removing common numbering patterns (e.g., "1. ", "2. ", "(1) ", etc.)
+        import re
+
+        # Pattern to match numbering prefixes like "1. ", "2. ", "(1) ", "1) ", etc.
+        cleaned_subtask = re.sub(r'^\s*\d+\.?\s*', '', current_subtask).strip()
+        cleaned_subtask = re.sub(r'^\s*\(\d+\)\s*', '', cleaned_subtask).strip()
+
+        # Try exact match with cleaned version
+        if cleaned_subtask in self.subtasks:
+            return self.subtasks.index(cleaned_subtask)
+
+        # Try partial match (first N characters) for robustness
+        for i, subtask in enumerate(self.subtasks):
+            # Remove numbering from stored subtask too
+            cleaned_stored = re.sub(r'^\s*\d+\.?\s*', '', subtask).strip()
+            cleaned_stored = re.sub(r'^\s*\(\d+\)\s*', '', cleaned_stored).strip()
+
+            # Check if they match (case insensitive, ignore extra whitespace)
+            if cleaned_subtask.lower().strip() == cleaned_stored.lower().strip():
+                return i
+
+            # Fallback: check if the cleaned subtask is contained in the stored subtask
+            if len(cleaned_subtask) > 10 and cleaned_subtask.lower() in cleaned_stored.lower():
+                return i
+
+        return None

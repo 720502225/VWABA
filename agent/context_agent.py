@@ -50,20 +50,16 @@ class ContextAgent:
         latest_reflection: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Update context state."""
-        if current_observation and (not self.state_manager.get_all_observations() or
-                                   current_observation != self.state_manager.get_latest_observation()):
+        if current_observation:
             self.state_manager.add_observation(current_observation)
 
-        if latest_intention and (not self.state_manager.get_all_intentions() or
-                                 latest_intention != self.state_manager.get_all_intentions()[-1]):
+        if latest_intention:
             self.state_manager.add_intention(latest_intention)
 
-        if latest_action and (not self.state_manager.get_all_actions() or
-                             latest_action != self.state_manager.get_latest_action()):
+        if latest_action:
             self.state_manager.add_action(latest_action)
 
-        if latest_reflection and (not self.state_manager.get_all_reflections() or
-                                 latest_reflection != self.state_manager.get_all_reflections()[-1]):
+        if latest_reflection:
             self.state_manager.add_reflection(latest_reflection)
 
     def update_context(

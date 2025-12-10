@@ -395,7 +395,7 @@ class MultiAgentCoordinator:
             print(f"🎯 Current Subtask: {current_subtask[:100]}{'...' if len(current_subtask) > 100 else ''}")
             if next_atomic_action != current_subtask:
                 print(f"🎯 Next Atomic Action: {next_atomic_action[:100]}{'...' if len(next_atomic_action) > 100 else ''}")
-            print(f"🎯 Progress: Step {current_step_index + 1}/{total_subtasks}")
+            # print(f"🎯 Progress: Step {current_step_index + 1}/{total_subtasks}")
 
             # Show all subtasks overview
             if all_subtasks and total_subtasks > 0:
