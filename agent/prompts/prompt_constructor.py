@@ -380,19 +380,20 @@ class MultimodalCoTPromptConstructor(CoTPromptConstructor):
                         "image_url": {"url": pil_to_b64(page_screenshot_img)},
                     },
                 ]
-                for image_i, image in enumerate(images):
-                    content.extend(
-                        [
-                            {
-                                "type": "text",
-                                "text": f"({image_i+2}) input image {image_i+1}",
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": pil_to_b64(image)},
-                            },
-                        ]
-                    )
+                if images is not None:
+                    for image_i, image in enumerate(images):
+                        content.extend(
+                            [
+                                {
+                                    "type": "text",
+                                    "text": f"({image_i+2}) input image {image_i+1}",
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": pil_to_b64(image)},
+                                },
+                            ]
+                        )
                 content = [{"type": "text", "text": current_prompt}] + content
 
                 message.append({"role": "user", "content": content})

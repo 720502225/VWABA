@@ -619,6 +619,10 @@ class TextObervationProcessor(ObservationProcessor):
         return "\n".join(clean_lines)
 
     def fetch_image_related(self, page: Page, browser_info: BrowserInfo) -> str:
+        # Skip captioning for image_som observation type when no captioning function is available
+        if self.observation_type == "image_som" and self.captioning_fn is None:
+            return ""
+
         # Check if the current page is an image url
         if page.url.endswith((".jpg", ".jpeg", ".png")):
             print("NOTE: We are on an image page!!!")

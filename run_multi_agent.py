@@ -7,6 +7,7 @@ using Context, Planner, Actor, and Reflector agents.
 import argparse
 import json
 import os
+import requests
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -226,13 +227,12 @@ def test(args, config_file):
 
     # Get browser environment configuration
     browser_config = config.get('browser', {})
-    observation_type = browser_config.get('observation_type', 'accessibility_tree')
+    observation_type = config.get('observation', {}).get('observation_type', 'accessibility_tree')
     
     # Load captioning model if needed (similar to run.py)
     caption_image_fn = None
     if observation_type in [
         "accessibility_tree_with_captioner",
-        "image_som",
     ]:
         device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
         dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -247,14 +247,18 @@ def test(args, config_file):
         "height": browser_config.get('viewport_height', 720),
     }
 
+    # Get observation config for browser parameters
+    observation_config = config.get('observation', {})
+    output_config = config.get('output', {})
+
     # Create browser environment
     env = ScriptBrowserEnv(
         headless=browser_config.get('headless', False),  # Set to False for debugging
         slow_mo=browser_config.get('slow_mo', 100),
         observation_type=observation_type,
-        current_viewport_only=browser_config.get('current_viewport_only', True),
+        current_viewport_only=observation_config.get('current_viewport_only', True),
         viewport_size=viewport_size,
-        save_trace_enabled=browser_config.get('save_trace_enabled', True),
+        save_trace_enabled=output_config.get('save_trace_enabled', True),
         sleep_after_execution=browser_config.get('sleep_after_execution', 0.5),
         captioning_fn=caption_image_fn,
     )
@@ -265,7 +269,8 @@ def test(args, config_file):
     model_name = lm_cfg.model.lower()
     is_multimodal_model = (
         "gemini" in model_name or 
-        ("gpt-4" in model_name and "vision" in model_name)
+        ("gpt-4" in model_name and "vision" in model_name) or
+        ("gpt-4o" in model_name)
     )
     is_image_observation = observation_type in ["image", "image_som"]
     
@@ -274,10 +279,10 @@ def test(args, config_file):
     if not instruction_path:
         # Select default instruction path based on observation type and model
         if is_multimodal_model and is_image_observation:
-            instruction_path = 'agent/prompts/jsons/p_multimodal_cot_id_actree_3s.json'
+            instruction_path = 'agent/prompts/jsons/p_multimodal_cot_id_actree_0s.json'
         else:
             instruction_path = 'agent/prompts/jsons/p_cot_id_actree_3s.json'
-    
+
     # Load instruction to check prompt_constructor type
     with open(instruction_path) as f:
         instruction_data = json.load(f)
@@ -321,6 +326,21 @@ def test(args, config_file):
                                         result_dir=result_dir,
                                         memory_config=config.get('memory', {}))
 
+    # Load input images for the task, if any.
+    image_paths = config.get('task', {}).get('image', None)
+    images = []
+    if image_paths is not None:
+        if isinstance(image_paths, str):
+            image_paths = [image_paths]
+        for image_path in image_paths:
+            # Load image either from the web or from a local path.
+            if image_path.startswith("http"):
+                input_image = Image.open(requests.get(image_path, stream=True).raw)
+            else:
+                input_image = Image.open(image_path)
+
+            images.append(input_image)
+
     # Execute workflow with initial observation from browser
     # Use start_url from config if available
     start_url = config.get('task', {}).get('start_url')
@@ -334,7 +354,8 @@ def test(args, config_file):
     result = coordinator.execute_task(
         user_goal=config.get('task', {}).get('intent', 'Not specified'),
         start_observation=initial_observation,
-        max_steps=config.get('task', {}).get('max_steps', 3)
+        max_steps=config.get('task', {}).get('max_steps', 3),
+        images=images if images else None
     )
 
     # Return the execution result

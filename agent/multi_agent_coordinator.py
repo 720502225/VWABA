@@ -73,6 +73,8 @@ class MultiAgentCoordinator:
         # Result directory and logging setup
         self.result_dir = result_dir
         self.log_file_path = os.path.join(result_dir, "agent_responses.log")
+        self.observation_log_path = os.path.join(result_dir, "observations.json")
+        self.images_dir = os.path.join(result_dir, "images")
         self._setup_logging()
 
         # Execution state
@@ -96,10 +98,18 @@ class MultiAgentCoordinator:
             # Ensure result directory exists
             os.makedirs(self.result_dir, exist_ok=True)
 
+            # Create images directory
+            os.makedirs(self.images_dir, exist_ok=True)
+
             # Create or clear the log file
             with open(self.log_file_path, 'w', encoding='utf-8') as f:
                 f.write(f"Multi-Agent Execution Log - Started at {datetime.now().isoformat()}\n")
                 f.write("=" * 80 + "\n\n")
+
+            # Initialize observation log file with empty list
+            with open(self.observation_log_path, 'w', encoding='utf-8') as f:
+                json.dump([], f, indent=2)
+
         except Exception as e:
             print(f"Warning: Failed to setup logging: {e}")
 
@@ -115,6 +125,40 @@ class MultiAgentCoordinator:
                 f.write("\n\n")
         except Exception as e:
             print(f"Warning: Failed to log {agent_name} response: {e}")
+
+    def log_observation(self, step_number: int, observation: Dict[str, Any]) -> None:
+        """Log observation text and save screenshot image."""
+        try:
+            # Load existing observations
+            with open(self.observation_log_path, 'r', encoding='utf-8') as f:
+                observations = json.load(f)
+
+            # Add new observation
+            obs_entry = {
+                "step": step_number,
+                "timestamp": datetime.now().isoformat(),
+                "text": observation.get("text", ""),
+                "has_image": observation.get("image") is not None
+            }
+            observations.append(obs_entry)
+
+            # Save updated observations
+            with open(self.observation_log_path, 'w', encoding='utf-8') as f:
+                json.dump(observations, f, indent=2, ensure_ascii=False)
+
+            # Save screenshot image if available
+            if observation.get("image") is not None:
+                image_path = os.path.join(self.images_dir, f"step_{step_number:03d}.png")
+                # Convert numpy array to PIL Image and save
+                from PIL import Image
+                import numpy as np
+
+                if isinstance(observation["image"], np.ndarray):
+                    img = Image.fromarray(observation["image"])
+                    img.save(image_path)
+
+        except Exception as e:
+            print(f"Warning: Failed to log observation for step {step_number}: {e}")
 
 
     def execute_task(
@@ -210,6 +254,18 @@ class MultiAgentCoordinator:
             }
             self.trajectory.append(initial_state_info)
             self.current_observation = initial_observation
+
+            # Save initial screenshot as step_000.png
+            if initial_observation.get("image") is not None:
+                initial_image_path = os.path.join(self.images_dir, "step_000.png")
+                # Convert numpy array to PIL Image and save
+                from PIL import Image
+                import numpy as np
+
+                if isinstance(initial_observation["image"], np.ndarray):
+                    img = Image.fromarray(initial_observation["image"])
+                    img.save(initial_image_path)
+                    print(f"📸 Saved initial screenshot as {initial_image_path}")
         
         # Main execution loop
         while True:
@@ -493,6 +549,9 @@ class MultiAgentCoordinator:
                         # Update current observation with new browser state
                         self.current_observation = obs  # Keep as observation format
                         new_observation = obs  # Keep as observation format
+
+                        # Log observation (text and image)
+                        self.log_observation(step_number, obs)
 
                         # Determine if intention is fulfilled based on execution success
                         intention_fulfilled = reward == 1.0  # reward is 1.0 for success, 0.0 for failure
