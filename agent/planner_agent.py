@@ -113,92 +113,12 @@ class PlannerAgent:
 
         return planning_result
 
-    def get_planning_statistics(self) -> Dict[str, Any]:
-        """Get statistics about planning performance and patterns.
-
-        Returns:
-            Dictionary containing planning statistics
-        """
-        if not self.task_decomposed:
-            return {
-                "total_subtasks": 0,
-                "current_step_index": 0,
-                "task_decomposed": False,
-                "message": "No planning history available"
-            }
-
-        return {
-            "total_subtasks": len(self.subtasks),
-            "current_step_index": self.current_step_index,
-            "task_decomposed": self.task_decomposed,
-            "completion_percentage": (self.current_step_index / len(self.subtasks)) if self.subtasks else 0.0,
-            "remaining_subtasks": len(self.subtasks) - self.current_step_index,
-            "all_subtasks": self.subtasks,
-            "current_subtask": self.subtasks[self.current_step_index] if self.current_step_index < len(self.subtasks) else "",
-            "completed_subtasks": self.subtasks[:self.current_step_index],
-        }
-
-    def should_adjust_planning_strategy(self) -> Dict[str, Any]:
-        """Determine if planning strategy needs adjustment based on performance.
-
-        Returns:
-            Dictionary containing adjustment recommendations
-        """
-        stats = self.get_planning_statistics()
-
-        if not stats["task_decomposed"]:
-            return {"needs_adjustment": False, "reason": "No planning data available"}
-
-        reasons = []
-        needs_adjustment = False
-
-        # Check if stuck on same subtask for too long
-        if stats["current_step_index"] == 0 and stats["total_subtasks"] > 0:
-            needs_adjustment = True
-            reasons.append("Still on first subtask, may need different approach")
-
-        # Check if approaching end without progress
-        if stats["current_step_index"] >= stats["total_subtasks"]:
-            needs_adjustment = True
-            reasons.append("Exhausted all subtasks but task may not be complete")
-
-        return {
-            "needs_adjustment": needs_adjustment,
-            "reasons": reasons,
-            "statistics": stats,
-        }
-
     def reset_planning_state(self) -> None:
         """Reset planning state for a new task."""
         self.subtasks.clear()
         self.current_step_index = 0
         self.task_decomposed = False
 
-    def get_current_subtask(self) -> str:
-        """Get the current subtask being worked on.
-
-        Returns:
-            Current subtask or empty string if no subtasks available
-        """
-        if self.current_step_index < len(self.subtasks):
-            return self.subtasks[self.current_step_index]
-        return ""
-
-    def get_remaining_subtasks(self) -> List[str]:
-        """Get remaining subtasks to be completed.
-
-        Returns:
-            List of remaining subtasks
-        """
-        return self.subtasks[self.current_step_index + 1:]
-
-    def mark_current_subtask_completed(self) -> None:
-        """Mark the current subtask as completed and move to next."""
-        if self.current_step_index < len(self.subtasks) - 1:
-            self.current_step_index += 1
-        elif self.current_step_index == len(self.subtasks) - 1:
-            self.current_step_index += 1  # Mark as beyond the end
-            print("🎯 All subtasks marked as completed")
 
     def _find_subtask_index(self, current_subtask: str) -> Optional[int]:
         """Find the index of a subtask, handling cases where LLM adds numbering prefixes.

@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional, Union
 import json
 import os
+import copy
 from datetime import datetime
 
 from PIL import Image
@@ -220,7 +221,13 @@ class MultiAgentCoordinator:
             elif isinstance(start_observation, dict) and "observation" in start_observation and "info" in start_observation:
                 # start_observation is already in StateInfo format: {"observation": obs, "info": info}
                 initial_observation = start_observation["observation"]
-                initial_info = start_observation["info"]
+                # Deep copy observation_metadata to avoid reference sharing issues
+                source_info = start_observation["info"]
+                initial_info = {
+                    "page": source_info.get("page"),
+                    "fail_error": source_info.get("fail_error", ""),
+                    "observation_metadata": copy.deepcopy(source_info.get("observation_metadata", {}))
+                }
                 # Ensure observation has both text and image fields
                 if isinstance(initial_observation, dict):
                     if "text" not in initial_observation:
@@ -561,18 +568,14 @@ class MultiAgentCoordinator:
                         # self.trajectory.append(state_info)
 
                         print(f"✅ Browser execution successful - URL: {info.get('page', {}).url if 'page' in info else 'Unknown'}")
-
-                        action_success = True
                     except Exception as e:
                         print(f"❌ Browser execution failed: {str(e)}")
                         intention_fulfilled = False
-                        action_success = False
                         info = None
                         new_observation = self.current_observation
                 else:
                     # No browser environment - simulate success for compatibility
                     intention_fulfilled = False  # Will be determined by reflection
-                    action_success = True
                     info = None
                     new_observation = self.current_observation
 
@@ -587,7 +590,6 @@ class MultiAgentCoordinator:
                     "intention": current_intention
                 }
                 self.actions.append(executed_action)
-                action_success = False
                 info = None
                 new_observation = self.current_observation
 
@@ -617,7 +619,6 @@ class MultiAgentCoordinator:
                 "intention": current_intention
             }
             self.actions.append(executed_action)
-            action_success = False
             info = None
             new_observation = self.current_observation
 
@@ -656,9 +657,18 @@ class MultiAgentCoordinator:
             }
 
         # Create new state_info from new_observation
+        # IMPORTANT: Deep copy observation_metadata to avoid reference sharing issue.
+        # browser_env.step() returns info with observation_metadata that references
+        # internal processor.meta_data which gets mutated on subsequent steps.
+        # Without deep copy, all trajectory entries would share the same metadata.
+        info_copy = {
+            "page": info.get("page"),  # page is already a new DetachedPage per step
+            "fail_error": info.get("fail_error", ""),
+            "observation_metadata": copy.deepcopy(info.get("observation_metadata", {}))
+        }
         new_state_info = {
             "observation": new_observation,  # new_observation is now observation format
-            "info": info
+            "info": info_copy
         }
         self.trajectory.append(new_state_info)
 
@@ -705,23 +715,11 @@ class MultiAgentCoordinator:
 
         self.reflections.append(reflection_result)
 
-        # Show key reflection information
-        success = reflection_result.get("success", False)
-        helpful = reflection_result.get("helpful", False)
-        stuck = reflection_result.get("stuck", False)
-        effectiveness_result = reflection_result.get("effectiveness_analyzer", "")
-        pattern_result = reflection_result.get("pattern_detector", "")
-        triple_summary = reflection_result.get("triple_summary", "")
-
-
         # Log reflector agent response summary
         reflector_response = {
-            "success": success,
-            "helpful": helpful,
-            "stuck": stuck,
-            "effectiveness_result": effectiveness_result,
-            "pattern_result": pattern_result,
-            "triple_summary": triple_summary
+            "effectiveness_result": reflection_result.get("effectiveness_analyzer", ""),
+            "pattern_result": reflection_result.get("pattern_detector", ""),
+            "triple_summary": reflection_result.get("triple_summary", "")
         }
         self.log_agent_response("reflector_agent", step_number, reflector_response)
 

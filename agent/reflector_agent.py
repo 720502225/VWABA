@@ -154,17 +154,6 @@ class ReflectorAgent:
             success_indicator = "Success" if action_type not in ["NONE", "STOP"] else "Failed"
             return f"Intent: {current_intention[:50]}{'...' if len(current_intention) > 50 else ''} | Action: {action_type} on {element_id} | Result: {success_indicator} (Enhanced summary unavailable: {str(e)})"
 
-    def get_recent_reflections(self, count: int = 5) -> List[Dict[str, Any]]:
-        """Get the most recent reflections.
-
-        Args:
-            count: Number of recent reflections to return
-
-        Returns:
-            List of recent reflection records
-        """
-        return self.reflection_history[-count:] if self.reflection_history else []
-
     def reset_reflection_history(self) -> None:
         """Reset reflection history for a new task."""
         self.reflection_history.clear()
