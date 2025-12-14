@@ -17,8 +17,8 @@ export GITLAB="<your_gitlab_domain>:8023"
 export MAP="<your_map_domain>:3000"
 
 # Environment variables (modify as needed)
-export OPENAI_API_KEY=sk-ba12564bebdb4f129f91944b55147971
-export OPENAI_BASE_URL=https://api.deepseek.com/v1
+export OPENAI_API_KEY=
+export OPENAI_BASE_URL=
 
 echo "🚀 Starting Multi-Agent Web Arena"
 echo "📋 Task: Search for Yao Ming's age and Shaquille O'Neal's age, then calculate the sum"
