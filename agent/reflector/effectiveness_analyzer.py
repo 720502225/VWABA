@@ -31,11 +31,6 @@ class EffectivenessAnalyzer:
         Returns:
             Natural language response about action effectiveness
         """
-        # Extract key metrics
-        previous_progress = context_summary.get("completion_status", 0.0)
-        making_progress = context_summary.get("making_progress", False)
-        success_rate = context_summary.get("success_rate", 0.0)
-
         # Get recent trajectory context
         recent_context = self._extract_recent_context(trajectory, latest_action)
 
@@ -52,6 +47,9 @@ class EffectivenessAnalyzer:
         else:
             action_text = "N/A"
 
+        # Get context summary text
+        summary_text = context_summary.get("summary", "No context summary available")
+
         # Build analysis prompt using template
         prompt = load_prompt_template(
             "reflector_agent",
@@ -60,7 +58,7 @@ class EffectivenessAnalyzer:
             trajectory_summary=recent_context,
             current_intention=current_intention,
             latest_action=f"Type: {latest_action.get('action_type', 'UNKNOWN')}, Element: {latest_action.get('element_id', 'N/A')}, Details: {action_text}",
-            context_summary=f"Previous completion: {previous_progress:.1%}, Currently making progress: {making_progress}, Success rate: {success_rate:.1%}"
+            context_summary=summary_text[:500] if len(summary_text) > 500 else summary_text
         )
 
         try:
@@ -71,7 +69,7 @@ class EffectivenessAnalyzer:
         except Exception as e:
             # Fallback effectiveness analysis
             action_type = latest_action.get("action_type", "UNKNOWN")
-            return f"Fallback analysis: Action '{action_type}' executed. Based on progress metrics ({previous_progress:.1%} completion, {making_progress} progress indication), this appears to be {'effective' if making_progress else 'ineffective'}."
+            return f"Fallback analysis: Action '{action_type}' executed for intention: {current_intention[:100]}."
 
     def _extract_recent_context(self, trajectory: Trajectory, latest_action: Action) -> str:
         """Extract relevant context from the recent trajectory."""

@@ -73,12 +73,6 @@ class ActorAgent(PromptAgent):
             intention_message = f"Execute browser actions to fulfill this intention: {intention}"
             
             # Use existing PromptAgent's next_action method with the intention message
-            # Validate inputs before calling next_action
-            if not trajectory:
-                pass
-            if not intention_message:
-                pass
-
             try:
                 action = self.next_action(
                     trajectory=trajectory,
@@ -121,43 +115,28 @@ class ActorAgent(PromptAgent):
             }
 
         except Exception as e:
-            import traceback
-
             # Provide more detailed error information
             error_details = str(e)
             if "prompt_constructor" in error_details.lower():
-                error_details += " (Prompt constructor issue - possibly incompatible with next_action)"
+                error_details += " (Prompt constructor issue)"
             elif "next_action" in error_details.lower():
                 error_details += " (next_action method failure)"
             elif "traject" in error_details.lower():
                 error_details += " (Trajectory processing issue)"
-            elif "attribute" in error_details.lower():
-                error_details += " (Attribute error - missing method or property)"
-
-            # Try to get LLM response if next_action was called
-            llm_response = "No LLM response available due to exception"
-            if hasattr(self, '_last_llm_response'):
-                llm_response = self._last_llm_response
 
             # Record failed execution
             execution_record.update({
-                "execution_success": False,
                 "error": error_details,
                 "exception_type": type(e).__name__,
-                "intention_fulfilled": False,
-                "llm_response": llm_response,
             })
             self.intention_history.append(execution_record)
 
             return {
-                "success": False,
                 "error": error_details,
                 "intention": intention,
                 "intention_fulfilled": False,
-                "execution_history_length": len(self.intention_history),
                 "exception_type": type(e).__name__,
-                "llm_response": llm_response,
-                "response": f"Execution failed: {error_details}. LLM Response: {llm_response[:200]}{'...' if len(llm_response) > 200 else ''}",
+                "response": f"Execution failed: {error_details}",
             }
 
     def reset_intention_history(self) -> None:

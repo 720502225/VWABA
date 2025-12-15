@@ -129,38 +129,29 @@ class ContextAgent:
             "total_steps": history.get("total_steps", 0),
         }
 
-    def check_task_completion(
-        self, user_goal: str, completion_threshold: float = 0.95
-    ) -> bool:
+    def check_task_completion(self, user_goal: str) -> bool:
         """Check if the task is considered complete based on current state.
+
+        This is a simplified check - task completion is primarily determined
+        by reaching max_steps or explicit STOP action in the coordinator.
 
         Args:
             user_goal: Original user goal
-            completion_threshold: Minimum completion percentage (default: 0.95)
 
         Returns:
-            True if task is considered complete, False otherwise
+            True if task appears complete, False otherwise
         """
-        # Simple completion check based on action count and reflections
+        # Task completion is determined by the coordinator based on:
+        # 1. Max steps reached
+        # 2. Actor generating a STOP action
+        # This method provides a basic fallback check
         history = self.state_manager.get_history()
-        total_steps = history.get("total_steps", 0)
-        reflections = history.get("reflections", [])
-
-        # Basic heuristic: if we have successful actions and no recent stuck patterns
-        if total_steps == 0:
-            return False
-
-        # Check recent reflections for success patterns
-        recent_reflections = reflections[-3:] if reflections else []
-        if recent_reflections:
-            successful = sum(1 for r in recent_reflections if r.get("success", False))
-            stuck = sum(1 for r in recent_reflections if r.get("stuck", False))
-
-            # Consider complete if mostly successful and no stuck patterns
-            success_rate = successful / len(recent_reflections)
-            return success_rate >= completion_threshold and stuck == 0
-
-        # Default fallback: assume incomplete without reflection data
+        actions = history.get("actions", [])
+        
+        # Check if the last action was a STOP action
+        if actions and actions[-1].get("action_type") == "STOP":
+            return True
+        
         return False
 
     def initialize_task_memory(self, user_goal: str) -> Dict[str, Any]:

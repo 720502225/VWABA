@@ -30,11 +30,9 @@ class WorkflowManager:
         self.execution_history.clear()
 
         return {
-            "workflow_id": None,  # Would be set in actual implementation
             "max_steps": max_steps,
             "current_step": 0,
             "workflow_state": "initialized",
-            "timestamp": None,  # Would be set in actual implementation
         }
 
     def should_continue_execution(
@@ -43,12 +41,12 @@ class WorkflowManager:
         """Determine if execution should continue.
 
         Args:
-            context_summary: Current context from Context Agent
+            context_summary: Current context from Context Agent (currently unused)
 
         Returns:
             Dictionary containing continuation decision and reasoning
         """
-        # Check step limit
+        # Check step limit - this is the primary stopping condition
         if self.current_step >= self.max_steps:
             return {
                 "should_continue": False,
@@ -56,36 +54,7 @@ class WorkflowManager:
                 "stop_type": "step_limit",
             }
 
-        # Check task completion
-        completion_percentage = context_summary.get("completion_status", 0.0)
-        if completion_percentage >= 0.95:
-            return {
-                "should_continue": False,
-                "reason": f"Task completed ({completion_percentage:.1%})",
-                "stop_type": "task_completed",
-            }
-
-        # Check for intervention needs
-        needs_intervention = context_summary.get("needs_intervention", False)
-        if needs_intervention:
-            return {
-                "should_continue": True,
-                "reason": "Intervention needed, continuing with recovery",
-                "stop_type": "none",
-                "requires_intervention": True,
-            }
-
-        # Check progress
-        making_progress = context_summary.get("making_progress", False)
-        if not making_progress and self.current_step > 5:
-            return {
-                "should_continue": True,
-                "reason": "Not making progress, but continuing",
-                "stop_type": "none",
-                "requires_monitoring": True,
-            }
-
-        # Default: continue
+        # Default: continue execution
         return {
             "should_continue": True,
             "reason": "Execution should continue",
@@ -113,14 +82,11 @@ class WorkflowManager:
         """
         step_record = {
             "step_number": step_number,
-            "timestamp": None,  # Would be set in actual implementation
             "intention": intention,
             "action": action,
             "observation": observation,
             "reflection": reflection,
             "execution_time": execution_time,
-            "step_success": reflection.get("success", False),
-            "step_helpful": reflection.get("helpful", False),
         }
 
         self.execution_history.append(step_record)
@@ -140,43 +106,21 @@ class WorkflowManager:
             }
 
         total_steps = len(self.execution_history)
-        successful_steps = sum(1 for record in self.execution_history if record.get("step_success", False))
-        helpful_steps = sum(1 for record in self.execution_history if record.get("step_helpful", False))
 
-        # Calculate success rates
-        success_rate = successful_steps / total_steps if total_steps > 0 else 0.0
-        helpful_rate = helpful_steps / total_steps if total_steps > 0 else 0.0
-
-        # Analyze recent performance (last 10 steps)
-        recent_steps = self.execution_history[-10:]
-        recent_success_rate = (
-            sum(1 for record in recent_steps if record.get("step_success", False))
-            / len(recent_steps)
-            if recent_steps
-            else 0.0
-        )
-
-        # Check for patterns in the workflow
-        stuck_steps = sum(
-            1
-            for record in self.execution_history
-            if record.get("reflection", {}).get("stuck", False)
-        )
+        # Count action types
+        action_types = {}
+        for record in self.execution_history:
+            action = record.get("action", {})
+            action_type = action.get("action_type", "UNKNOWN")
+            action_types[action_type] = action_types.get(action_type, 0) + 1
 
         return {
             "total_steps": total_steps,
-            "successful_steps": successful_steps,
-            "helpful_steps": helpful_steps,
-            "success_rate": success_rate,
-            "helpful_rate": helpful_rate,
-            "recent_success_rate": recent_success_rate,
-            "stuck_steps": stuck_steps,
-            "stuck_rate": stuck_steps / total_steps if total_steps > 0 else 0.0,
             "current_step": self.current_step,
             "max_steps": self.max_steps,
             "workflow_state": self.workflow_state,
-            "completion_percentage": (self.current_step / self.max_steps) * 100,
-            "performance_trend": "improving" if recent_success_rate > success_rate else "stable",
+            "progress_percentage": (self.current_step / self.max_steps) * 100,
+            "action_type_distribution": action_types,
         }
 
     def finalize_workflow(self, final_state: str, completion_reason: str) -> Dict[str, Any]:
@@ -192,13 +136,11 @@ class WorkflowManager:
         self.workflow_state = final_state
 
         finalization_record = {
-            "workflow_id": None,  # Would be set in actual implementation
             "final_state": final_state,
             "completion_reason": completion_reason,
             "total_steps": self.current_step,
             "max_steps": self.max_steps,
             "statistics": self.get_workflow_statistics(),
-            "timestamp": None,  # Would be set in actual implementation
             "execution_summary": self._generate_execution_summary(),
         }
 
@@ -210,11 +152,7 @@ class WorkflowManager:
             return "No execution steps recorded"
 
         stats = self.get_workflow_statistics()
-        return (
-            f"Workflow completed with {stats['success_rate']:.1%} success rate, "
-            f"{stats['helpful_rate']:.1%} helpfulness rate, "
-            f"and {stats['stuck_steps']} stuck steps out of {stats['total_steps']} total steps."
-        )
+        return f"Workflow completed with {stats['total_steps']} steps out of {stats['max_steps']} maximum."
 
     def reset_workflow(self) -> None:
         """Reset the workflow for a new task."""
