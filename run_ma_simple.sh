@@ -26,7 +26,7 @@ export OPENAI_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
 echo "🚀 Starting Multi-Agent Web Arena"
 echo "📋 Task: Search for Yao Ming's age and Shaquille O'Neal's age, then calculate the sum"
 echo "🌐 URL: https://www.baidu.com"
-echo "🧠 Model: deepseek-chat"
+echo "🧠 Model: qwen3-vl-plus"
 
 # Run the multi-agent script
 # python run_multi_agent.py \
